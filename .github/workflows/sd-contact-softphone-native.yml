@@ -2,7 +2,7 @@ name: Service Desk contato e softphone - testes nativos isolados
 
 on:
   push:
-    branches: [codex/sd-contato-softphone-20261011]
+    branches: [codex/hoya-inicial-20261013]
   workflow_dispatch:
 
 permissions:
@@ -81,7 +81,7 @@ jobs:
         run: |
           python3 - <<'PY'
           import collections, json, pathlib, subprocess
-          base = '9f9cf83cceae9e4ea8e636fecc80a08666cccb53'
+          base = '0a48af8bb59e78a5698398268ce009dd8c5145a3'
           files = subprocess.check_output(['git', 'diff', '--name-only', '--diff-filter=ACMR', base, 'HEAD', '--', '*.rb'], text=True).splitlines()
           rows, blockers = [], []
           for path in files:

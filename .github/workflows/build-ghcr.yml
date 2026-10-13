@@ -1,4 +1,4 @@
-name: Candidato Cadastro Mestre - build e GHCR por SHA
+name: HOYA - build e GHCR por SHA
 
 on:
   workflow_dispatch:
@@ -31,13 +31,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     concurrency:
-      group: ghcr-jrc-conversas-${{ inputs.component }}
+      group: ghcr-hoya-${{ inputs.component }}
       cancel-in-progress: false
     env:
       SOURCE_SHA: ${{ inputs.source_sha }}
       BASE_SHA: ${{ inputs.base_sha }}
       COMPONENT: ${{ inputs.component }}
-      IMAGE: ${{ inputs.component == 'app' && 'claudiohideki/jrc-conversas-lab2' || format('claudiohideki/jrc-conversas-nico-v12-2-7-comercial-integrado-{0}', inputs.component) }}
+      IMAGE: ${{ inputs.component == 'app' && 'claudiohideki/jrcconversa-hoya' || format('claudiohideki/jrcconversa-hoya-{0}', inputs.component) }}
       BUNDLE_FROZEN: 'true'
       TZ: UTC
 
@@ -61,7 +61,7 @@ jobs:
           echo "BASE_SHA=$BASE_SHA" >> "$GITHUB_ENV"
           git diff --check "$BASE_SHA" "$SOURCE_SHA"
           case "$COMPONENT" in
-            app) paths=(app config db lib enterprise public Gemfile Gemfile.lock package.json pnpm-lock.yaml docker/Dockerfile docker/entrypoints) ;;
+            app) paths=(app config db lib enterprise public Gemfile Gemfile.lock package.json pnpm-lock.yaml docker/Dockerfile docker/entrypoints .github/workflows/build-ghcr.yml) ;;
             nico-runtime) paths=(services/nico-runtime docker/nico-runtime.Dockerfile) ;;
             flows-sandbox) paths=(services/flows-sandbox) ;;
             *) exit 1 ;;
@@ -200,8 +200,8 @@ jobs:
         run: |
           python3 - <<'PYTHON'
           import hashlib, json, os, pathlib, subprocess
-          paths = subprocess.check_output(['git', 'diff', '--name-only', '--diff-filter=ACMR', os.environ['BASE_SHA'], os.environ['SOURCE_SHA']], text=True).splitlines()
-          paths = [p for p in paths if p.startswith(('app/', 'config/', 'db/', 'lib/', 'enterprise/', 'public/')) and '/spec/' not in p and '/specs/' not in p and not p.endswith(('.spec.js', '.spec.vue'))]
+          paths = subprocess.check_output(['git', 'ls-files', '--', 'app', 'config', 'db', 'lib', 'enterprise', 'public'], text=True).splitlines()
+          paths = [p for p in paths if p.startswith(('app/', 'config/', 'db/', 'lib/', 'enterprise/', 'public/')) and '/spec/' not in p and '/specs/' not in p and not p.endswith(('.spec.js', '.spec.vue', '.md', '.log')) and not p.startswith(('public/system/', 'public/packs/', 'public/vite'))]
           migrations = [
               'db/migrate/20261004170000_complete_jrc_customer_master_company_profile.rb',
               'db/migrate/20261004183000_strengthen_sales_order_origin_and_audit.rb',
