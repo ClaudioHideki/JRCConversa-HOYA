@@ -1,0 +1,257 @@
+{
+  "COMPONENTS": {
+    "FILE_BUBBLE": {
+      "DOWNLOAD": "Download",
+      "UPLOADING": "Uploading..."
+    },
+    "FORM_BUBBLE": {
+      "SUBMIT": "Submit"
+    },
+    "MESSAGE_BUBBLE": {
+      "RETRY": "Send message again",
+      "ERROR_MESSAGE": "Couldn't send, try again"
+    }
+  },
+  "THUMBNAIL": {
+    "AUTHOR": {
+      "NOT_AVAILABLE": "Not available"
+    }
+  },
+  "TEAM_AVAILABILITY": {
+    "ONLINE": "We are online",
+    "OFFLINE": "We are away at the moment",
+    "BACK_AS_SOON_AS_POSSIBLE": "We will be back as soon as possible"
+  },
+  "REPLY_TIME": {
+    "IN_A_FEW_MINUTES": "Typically replies in a few minutes",
+    "IN_A_FEW_HOURS": "Typically replies in a few hours",
+    "IN_A_DAY": "Typically replies in a day",
+    "BACK_IN_HOURS": "We will be back online in {n} hour | We will be back online in {n} hours",
+    "BACK_IN_MINUTES": "We will be back online in {time} minutes",
+    "BACK_AT_TIME": "We will be back online at {time}",
+    "BACK_ON_DAY": "We will be back online on {day}",
+    "BACK_TOMORROW": "We will be back online tomorrow",
+    "BACK_IN_SOME_TIME": "We will be back online in some time"
+  },
+  "DAY_NAMES": {
+    "SUNDAY": "Sunday",
+    "MONDAY": "Monday",
+    "TUESDAY": "Tuesday",
+    "WEDNESDAY": "Wednesday",
+    "THURSDAY": "Thursday",
+    "FRIDAY": "Friday",
+    "SATURDAY": "Saturday"
+  },
+  "START_CONVERSATION": "Start Conversation",
+  "END_CONVERSATION": "End Conversation",
+  "CONTINUE_CONVERSATION": "Continue conversation",
+  "YOU": "You",
+  "START_NEW_CONVERSATION": "Start a new conversation",
+  "VIEW_UNREAD_MESSAGES": "You have unread messages",
+  "UNREAD_VIEW": {
+    "VIEW_MESSAGES_BUTTON": "See new messages",
+    "CLOSE_MESSAGES_BUTTON": "Close",
+    "COMPANY_FROM": "from",
+    "BOT": "Bot"
+  },
+  "BUBBLE": {
+    "LABEL": "Chat with us"
+  },
+  "POWERED_BY": "Powered by Chatwoot",
+  "EMAIL_PLACEHOLDER": "Please enter your email",
+  "CHAT_PLACEHOLDER": "Type your message",
+  "TODAY": "Today",
+  "YESTERDAY": "Yesterday",
+  "PRE_CHAT_FORM": {
+    "FIELDS": {
+      "FULL_NAME": {
+        "LABEL": "Full Name",
+        "PLACEHOLDER": "Please enter your full name",
+        "REQUIRED_ERROR": "Full Name is required"
+      },
+      "EMAIL_ADDRESS": {
+        "LABEL": "Email Address",
+        "PLACEHOLDER": "Please enter your email address",
+        "REQUIRED_ERROR": "Email Address is required",
+        "VALID_ERROR": "Please enter a valid email address"
+      },
+      "PHONE_NUMBER": {
+        "LABEL": "Phone Number",
+        "PLACEHOLDER": "Please enter your phone number",
+        "REQUIRED_ERROR": "Phone Number is required",
+        "DIAL_CODE_VALID_ERROR": "Please select a country code",
+        "VALID_ERROR": "Please enter a valid phone number",
+        "DROPDOWN_EMPTY": "No results found",
+        "DROPDOWN_SEARCH": "Search country"
+      },
+      "MESSAGE": {
+        "LABEL": "Message",
+        "PLACEHOLDER": "Please enter your message",
+        "ERROR": "Message too short"
+      }
+    },
+    "CAMPAIGN_HEADER": "Please provide your name and email before starting the conversation",
+    "IS_REQUIRED": "is required",
+    "REQUIRED": "Required",
+    "REGEX_ERROR": "Please provide a valid input"
+  },
+  "FILE_SIZE_LIMIT": "File exceeds the {MAXIMUM_FILE_UPLOAD_SIZE} attachment limit",
+  "CHAT_FORM": {
+    "INVALID": {
+      "FIELD": "Invalid field"
+    }
+  },
+  "EMOJI": {
+    "PLACEHOLDER": "Search emojis",
+    "NOT_FOUND": "No emoji match your search",
+    "ARIA_LABEL": "Emoji picker"
+  },
+  "EMOJI_ICON_PICKER": {
+    "SEARCH_EMOJI": "Search emoji…",
+    "FREQUENTLY_USED": "Frequently used",
+    "NO_EMOJI": "No emoji match your search"
+  },
+  "CSAT": {
+    "TITLE": "Rate your conversation",
+    "SUBMITTED_TITLE": "Thank you for submitting the rating",
+    "PLACEHOLDER": "Tell us more..."
+  },
+  "EMAIL_TRANSCRIPT": {
+    "BUTTON_TEXT": "Request a conversation transcript",
+    "SEND_EMAIL_SUCCESS": "The chat transcript was sent successfully",
+    "SEND_EMAIL_ERROR": "There was an error, please try again"
+  },
+  "INTEGRATIONS": {
+    "DYTE": {
+      "CLICK_HERE_TO_JOIN": "Click here to join",
+      "LEAVE_THE_ROOM": "Leave the call"
+    }
+  },
+  "PORTAL": {
+    "POPULAR_ARTICLES": "Popular Articles",
+    "VIEW_ALL_ARTICLES": "View all articles",
+    "IFRAME_LOAD_ERROR": "There was an error loading the article, please refresh the page and try again."
+  },
+  "ATTACHMENTS": {
+    "image": {
+      "CONTENT": "Picture message"
+    },
+    "audio": {
+      "CONTENT": "Audio message"
+    },
+    "video": {
+      "CONTENT": "Video message"
+    },
+    "file": {
+      "CONTENT": "File Attachment"
+    },
+    "location": {
+      "CONTENT": "Location"
+    },
+    "fallback": {
+      "CONTENT": "has shared a url"
+    }
+  },
+  "FOOTER_REPLY_TO": {
+    "REPLY_TO": "Replying to:"
+  },
+  "SERVICE_DESK": {
+    "open": "Service Desk",
+    "close": "Close",
+    "loading": "Loading authorized tickets…",
+    "error": "The operation could not be confirmed. Refresh your authorized session or retry the same request.",
+    "conflict": "The request or catalogue changed. Review the current configuration before retrying.",
+    "service": "Service",
+    "title": "Subject",
+    "description": "Description",
+    "attachments": "Attachments",
+    "create": "Open ticket",
+    "reply": "Customer reply",
+    "send": "Send reply",
+    "conversation": "Linked conversation",
+    "back": "Back to tickets",
+    "saved": "Saved and verified",
+    "scan_unavailable": "Attachment awaits a verified scan",
+    "states": {
+      "open": "Open",
+      "in_progress": "In progress",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    },
+    "knowledge": "Knowledge base",
+    "knowledge_before_open": "Check the published answers before opening a ticket.",
+    "knowledge_search": "Search published answers",
+    "knowledge_empty": "No published answers were found.",
+    "search": "Search",
+    "ticket_search": "Search by ticket number or title",
+    "contract": "Contract",
+    "choose_contract": "Choose the eligible contract",
+    "no_eligible_contract": "There is no eligible contract for this service.",
+    "choose_conversation": "Choose the linked conversation for this reply",
+    "sla": "Service deadlines",
+    "breached": "Deadline exceeded",
+    "within_budget": "Within the recorded deadline",
+    "budget": "Allowed time",
+    "elapsed": "Elapsed time",
+    "remaining": "Remaining time",
+    "consumed": "Time consumed",
+    "time_basis": "Time basis",
+    "due": "Due at",
+    "observed": "Snapshot recorded at",
+    "achieved": "Achieved at",
+    "duration_minutes": "{value} minutes",
+    "notifications": "Notification history",
+    "notification_evidence": "Sending and delivery are shown separately using the recorded evidence.",
+    "attempt": "Attempt {value}",
+    "created": "Created at",
+    "updated": "Updated at",
+    "sent_at": "Sent at",
+    "delivered_at": "Delivered at",
+    "surveys": "Customer surveys",
+    "survey_expires": "Available until {value}",
+    "clock_kinds": {
+      "first_response": "First response",
+      "attendance": "Attendance",
+      "resolution": "Resolution",
+      "ola": "Operational deadline"
+    },
+    "clock_states": {
+      "running": "Running",
+      "paused": "Paused",
+      "completed": "Completed",
+      "stopped": "Stopped"
+    },
+    "clock_basis": {
+      "business": "Business hours",
+      "calendar": "Calendar time"
+    },
+    "delivery_channels": {
+      "email": "Email",
+      "whatsapp": "WhatsApp"
+    },
+    "delivery_states": {
+      "blocked": "Blocked",
+      "queued": "Queued",
+      "dispatching": "Sending",
+      "sent": "Sent",
+      "delivered": "Delivered",
+      "read": "Read",
+      "failed": "Failed",
+      "unknown": "Outcome not confirmed"
+    },
+    "survey_kinds": {
+      "nps": "NPS survey",
+      "csat": "CSAT survey",
+      "ces": "CES survey",
+      "custom": "Customer survey"
+    },
+    "EXPERIENCE": {
+      "no_tickets": "No tickets match this authorized view.",
+      "visible_count": "{count} tickets visible in this response",
+      "protocol": "Official ticket protocol",
+      "copy": "Copy protocol",
+      "copied": "Protocol copied",
+      "public_only": "Only public updates and attachments authorized for your identity are shown."
+    }
+  }
+}

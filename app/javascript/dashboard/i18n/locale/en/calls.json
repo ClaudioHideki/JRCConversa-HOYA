@@ -1,0 +1,68 @@
+{
+  "SOFTPHONE": {
+    "EXTENSION_OFF": "Extension off",
+    "TABS": {
+      "PHONE": "Phone",
+      "CONTACTS": "Contacts",
+      "HISTORY": "History"
+    },
+    "TITLE": "Softphone",
+    "WHATSAPP": "WhatsApp",
+    "MINIMIZE": "Minimize phone; keep the call connected",
+    "EXTENSION": "Extension {number}",
+    "DESTINATION": "Phone number or extension",
+    "LOADING": "Loading your extension...",
+    "NOT_CONFIGURED": "Your extension has not been configured yet. Contact your administrator.",
+    "OTHER_CALL_BUSY": "Finish the current call before starting another.",
+    "ENABLE_EXTENSION": "Enable extension",
+    "REJECT": "Reject",
+    "HOLD": "Hold",
+    "RESUME": "Resume",
+    "ENABLE_NOTIFICATIONS": "Enable call notifications",
+    "NOTIFICATIONS_DENIED": "Call notifications are blocked. Allow notifications in your browser settings.",
+    "OPEN_IN_JRC": "Open in JRC Conversas"
+  },
+  "CALLS_PAGE": {
+    "HEADER": "Calls",
+    "ALL_CALLS": "All Calls",
+    "ALL_CALLS_COUNT": "All Calls ({count})",
+    "EMPTY_STATE": "No calls found",
+    "SETUP": {
+      "TITLE": "Make and receive calls in one place",
+      "SUBTITLE": "Set up a voice channel to start handling calls with your team. Every call, along with its recording, will appear here.",
+      "ACTION": "Set up voice channel"
+    },
+    "FILTERS": {
+      "MISSED": "Missed",
+      "NO_REPLY": "No reply",
+      "OTHER_ACTIVITY": "Other activity",
+      "INCOMING": "Incoming",
+      "OUTGOING": "Outgoing",
+      "IN_PROGRESS": "In progress",
+      "ASSIGNEE": "Assignee",
+      "ALL_ASSIGNEES": "All assignees",
+      "MORE_FILTERS": "More filters",
+      "INBOX": "Inbox",
+      "ALL_INBOXES": "All inboxes"
+    },
+    "STATUS": {
+      "ONGOING": "Ongoing",
+      "INCOMING": "Incoming",
+      "OUTGOING": "Outgoing",
+      "MISSED": "Missed",
+      "NO_REPLY": "No reply",
+      "FAILED": "Failed"
+    },
+    "ROW": {
+      "PICKED_BY": "Picked by",
+      "DIALED_BY": "Dialed by",
+      "ANSWERED": "Answered",
+      "RINGING": "Ringing",
+      "IN_PROGRESS": "In progress",
+      "NO_AGENT": "No agent answered this call",
+      "NO_CONTACT_ANSWER": "Contact did not answer",
+      "FAILED": "This call could not be connected",
+      "YESTERDAY": "Yesterday"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "printWidth": 80,
+  "singleQuote": true,
+  "trailingComma": "es5",
+  "arrowParens": "avoid",
+  "overrides": [
+    {
+      "files": [
+        "app/javascript/dashboard/routes/dashboard/jrcCustomers/**/*.vue",
+        "app/javascript/dashboard/routes/dashboard/jrcRelationship/**/*.vue",
+        "app/javascript/dashboard/routes/dashboard/serviceDesk/components/OperationalReportPanel.vue",
+        "app/javascript/dashboard/routes/dashboard/approvals/**/*.vue"
+      ],
+      "options": {
+        "singleAttributePerLine": true
+      }
+    }
+  ]
+}

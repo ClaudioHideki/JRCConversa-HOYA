@@ -1,0 +1,17 @@
+name: Legado desativado - use build-ghcr.yml
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  use-official-workflow:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Encaminhar ao workflow oficial com SHA aprovado
+        run: |
+          echo 'Use build-ghcr.yml com source_sha completo, component=app e publish=false para validar.' >&2
+          echo 'A publicacao exige publish=true e recusa sobrescrever tags sha existentes.' >&2
+          exit 1
