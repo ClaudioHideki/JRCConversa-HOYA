@@ -42,10 +42,10 @@ jobs:
           persist-credentials: false
       - name: Confirmar branch, commit e recursos
         run: |
-          test "$GITHUB_REF" = refs/heads/codex/sd-contato-softphone-20261011
+          test "$GITHUB_REF" = refs/heads/codex/hoya-inicial-20261013
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git merge-base --is-ancestor 9f9cf83cceae9e4ea8e636fecc80a08666cccb53 HEAD
-          git diff --check 9f9cf83cceae9e4ea8e636fecc80a08666cccb53 HEAD
+          git merge-base --is-ancestor 0a48af8bb59e78a5698398268ce009dd8c5145a3 HEAD
+          git diff --check 0a48af8bb59e78a5698398268ce009dd8c5145a3 HEAD
           free -h
           df -h /
       - uses: actions/setup-node@v4
