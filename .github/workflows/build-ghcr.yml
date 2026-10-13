@@ -1,6 +1,8 @@
 name: HOYA - build e GHCR por SHA
 
 on:
+  push:
+    branches: [codex/hoya-inicial-20261013]
   workflow_dispatch:
     inputs:
       publish:
@@ -28,6 +30,7 @@ permissions:
 
 jobs:
   build-and-push:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     concurrency:
