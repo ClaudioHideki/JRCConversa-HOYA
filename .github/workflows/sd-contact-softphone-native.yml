@@ -44,8 +44,8 @@ jobs:
         run: |
           test "$GITHUB_REF" = refs/heads/codex/hoya-inicial-20261013
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git merge-base --is-ancestor 0a48af8bb59e78a5698398268ce009dd8c5145a3 HEAD
-          git diff --check 0a48af8bb59e78a5698398268ce009dd8c5145a3 HEAD
+          git merge-base --is-ancestor f22a5e6866ecc0ac7bdad24e94cb711607429f62 HEAD
+          git diff --check f22a5e6866ecc0ac7bdad24e94cb711607429f62 HEAD
           free -h
           df -h /
       - uses: actions/setup-node@v4
@@ -81,7 +81,7 @@ jobs:
         run: |
           python3 - <<'PY'
           import collections, json, pathlib, subprocess
-          base = '0a48af8bb59e78a5698398268ce009dd8c5145a3'
+          base = 'f22a5e6866ecc0ac7bdad24e94cb711607429f62'
           files = subprocess.check_output(['git', 'diff', '--name-only', '--diff-filter=ACMR', base, 'HEAD', '--', '*.rb'], text=True).splitlines()
           rows, blockers = [], []
           for path in files:

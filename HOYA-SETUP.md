@@ -9,7 +9,7 @@ Esta importação não inclui histórico Git anterior, bancos, uploads, volumes,
 O workflow `build-ghcr.yml` publica o componente `app` exclusivamente em
 `ghcr.io/claudiohideki/jrcconversa-hoya:sha-<SHA completo HOYA>`.
 Componentes adicionais, quando explicitamente publicados, usam pacotes `jrcconversa-hoya-<componente>`.
-Fornecer `source_sha` final e `base_sha` da importação `0a48af8bb59e78a5698398268ce009dd8c5145a3`. Tags SHA existentes não são sobrescritas.
+Fornecer `source_sha` final e `base_sha` da importação `f22a5e6866ecc0ac7bdad24e94cb711607429f62`. Tags SHA existentes não são sobrescritas.
 Dockerfile, bases fixadas e dependências são as mesmas da versão de origem.
 O workflow nativo usa PostgreSQL e credenciais descartáveis, nunca bancos reais.
 

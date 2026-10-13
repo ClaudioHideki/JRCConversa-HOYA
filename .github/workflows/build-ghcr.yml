@@ -64,7 +64,7 @@ jobs:
           echo "BASE_SHA=$BASE_SHA" >> "$GITHUB_ENV"
           git diff --check "$BASE_SHA" "$SOURCE_SHA"
           case "$COMPONENT" in
-            app) paths=(app config db lib enterprise public Gemfile Gemfile.lock package.json pnpm-lock.yaml docker/Dockerfile docker/entrypoints .github/workflows/build-ghcr.yml) ;;
+            app) paths=(app config db lib enterprise public Gemfile Gemfile.lock package.json pnpm-lock.yaml docker/Dockerfile docker/entrypoints .github/workflows/build-ghcr.yml .github/workflows/sd-contact-softphone-native.yml) ;;
             nico-runtime) paths=(services/nico-runtime docker/nico-runtime.Dockerfile) ;;
             flows-sandbox) paths=(services/flows-sandbox) ;;
             *) exit 1 ;;
