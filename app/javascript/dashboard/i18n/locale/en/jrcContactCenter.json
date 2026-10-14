@@ -1,0 +1,89 @@
+{
+  "JRC_CONTACT_CENTER": {
+    "TITLE": "JRC Contact Center",
+    "SUBTITLE": "Telefonia, contexto do cliente, supervisao e indicadores em uma unica operacao.",
+    "STATUS": {
+      "FOUNDATION": "Fundacao F0",
+      "PENDING_CONTRACT": "Contrato externo pendente de homologacao",
+      "READY": "Disponivel"
+    },
+    "NAV": {
+      "COCKPIT": "Operacao",
+      "SUPERVISOR": "Supervisor",
+      "CONTROL_DESK": "Control Desk",
+      "OCCURRENCES": "Ocorrencias",
+      "REPORTS": "Relatorios",
+      "SETTINGS": "Configuracoes"
+    },
+    "CARDS": {
+      "UNITS": "Unidades",
+      "QUEUES": "Filas",
+      "ACTIVE_CALLS": "Chamadas ativas",
+      "OPEN_CASES": "Ocorrencias abertas",
+      "PENDING_CALLBACKS": "Callbacks pendentes",
+      "MEMBERSHIPS": "Vinculos de agentes"
+    },
+    "COMMON": {
+      "LOADING": "Carregando Contact Center...",
+      "EMPTY": "Nenhum registro encontrado.",
+      "ERROR": "Nao foi possivel carregar os dados do Contact Center.",
+      "PROVIDER": "Provedor",
+      "PROVIDER_VALUE": "Provedor: {value}",
+      "ANI": "ANI",
+      "DNIS": "DNIS",
+      "ROLE": "Perfil",
+      "ACTIVE": "ativo",
+      "INACTIVE": "inativo",
+      "CODE_DETAIL": "{code} · {detail}",
+      "STATUS": "Status",
+      "NAME": "Nome",
+      "CODE": "Codigo",
+      "TYPE": "Tipo",
+      "STARTED_AT": "Inicio",
+      "DIRECTION": "Direcao",
+      "SCHEDULED_AT": "Agendado para",
+      "TARGET": "Destino"
+    },
+    "COCKPIT": {
+      "TITLE": "Cockpit do agente",
+      "DESCRIPTION": "Fundacao operacional pronta para receber eventos homologados do JRC PABX.",
+      "RECENT_CALLS": "Chamadas recentes",
+      "NO_LIVE_PROVIDER": "A F0 nao inventa endpoints do PABX. O adapter esta instalado, mas URA, ACD, transferencia, CDR e gravacoes permanecem como capabilities pendentes ate o contrato oficial.",
+      "CALLBACKS": "Callbacks programados"
+    },
+    "SUPERVISOR": {
+      "TITLE": "Supervisor",
+      "DESCRIPTION": "Visao estrutural de unidades, filas e chamadas do escopo autorizado.",
+      "UNITS": "Unidades operacionais",
+      "QUEUES": "Filas de voz"
+    },
+    "CONTROL_DESK": {
+      "TITLE": "Control Desk",
+      "DESCRIPTION": "Saude e capacidades de integracao sem assumir contratos externos ainda nao homologados.",
+      "CAPABILITIES": "Matriz de capacidades"
+    },
+    "OCCURRENCES": {
+      "TITLE": "Ocorrencias de atendimento",
+      "DESCRIPTION": "Ocorrencias nativas do Contact Center, independentes do Service Desk.",
+      "PROTOCOL": "Protocolo",
+      "PRIORITY": "Prioridade",
+      "SUMMARY": "Resumo"
+    },
+    "REPORTS": {
+      "TITLE": "Relatorios Contact Center",
+      "DESCRIPTION": "Projecao reconciliavel baseada em fatos diarios; os KPIs oficiais dependem dos eventos canonicos do JRC PABX.",
+      "OFFERED": "Oferecidas",
+      "ANSWERED": "Atendidas",
+      "ABANDONED": "Abandonadas",
+      "TRANSFERRED": "Transferidas",
+      "FALLBACK": "Fallback COE > SAC"
+    },
+    "SETTINGS": {
+      "TITLE": "Configuracoes Contact Center",
+      "DESCRIPTION": "Estrutura F0 para unidades, filas, roteamento e contratos de integracao.",
+      "ROUTING": "Regras de roteamento",
+      "INTEGRATIONS": "Integracoes",
+      "MEMBERSHIPS": "Agentes por fila"
+    }
+  }
+}

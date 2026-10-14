@@ -157,6 +157,27 @@ const hasServiceDesk = computed(() =>
   ) === true
 );
 
+const hasContactCenter = computed(
+  () =>
+    isFeatureEnabledonAccount.value(
+      accountId.value,
+      FEATURE_FLAGS.JRC_CONTACT_CENTER
+    ) === true
+);
+
+const hasContactCenterAccess = computed(() => {
+  if (!hasContactCenter.value) return false;
+  const currentAccount = currentUser.value?.accounts?.find(
+    account => Number(account.id) === Number(accountId.value)
+  );
+  const permissions = currentAccount?.permissions || [];
+  return (
+    permissions.includes('administrator') ||
+    permissions.includes('agent') ||
+    permissions.includes('jrc_contact_center_view')
+  );
+});
+
 const { status: operationsStatus } = useOperations();
 const serviceDeskNavigation = useServiceDeskNavigation(accountId, currentUserId, hasServiceDesk);
 const approvalEnabled = computed(() => isFeatureEnabledonAccount.value(accountId.value, 'jrc_approvals'));
@@ -1137,6 +1158,12 @@ const menuItems = computed(() => {
         'jrc_calls_center',
         'ramal_index',
         'calls_dashboard_index',
+        'jrc_contact_center_cockpit',
+        'jrc_contact_center_supervisor',
+        'jrc_contact_center_control_desk',
+        'jrc_contact_center_occurrences',
+        'jrc_contact_center_reports',
+        'jrc_contact_center_settings',
       ],
       children: [
         {
@@ -1162,6 +1189,24 @@ const menuItems = computed(() => {
                 icon: 'i-lucide-history',
                 to: accountScopedRoute('calls_dashboard_index'),
                 activeOn: ['calls_dashboard_index'],
+              },
+            ]
+          : []),
+        ...(hasContactCenterAccess.value
+          ? [
+              {
+                name: 'JRC Contact Center Operation',
+                label: t('JRC_CONTACT_CENTER.NAV.COCKPIT'),
+                icon: 'i-lucide-headphones',
+                to: accountScopedRoute('jrc_contact_center_cockpit'),
+                activeOn: ['jrc_contact_center_cockpit'],
+              },
+              {
+                name: 'JRC Contact Center Occurrences',
+                label: t('JRC_CONTACT_CENTER.NAV.OCCURRENCES'),
+                icon: 'i-lucide-clipboard-list',
+                to: accountScopedRoute('jrc_contact_center_occurrences'),
+                activeOn: ['jrc_contact_center_occurrences'],
               },
             ]
           : []),
