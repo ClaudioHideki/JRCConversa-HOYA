@@ -15,6 +15,7 @@ import JrcContactCenterAPI from 'dashboard/api/jrcContactCenter';
 import ConversationCard from 'dashboard/components/widgets/conversation/ConversationCard.vue';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 import CallWorkspace from 'dashboard/routes/dashboard/jrcContactCenter/views/CallWorkspace.vue';
+import HoyaInboxWorkspace from './HoyaInboxWorkspace.vue';
 import {
   ASSIGNEE_FILTERS,
   canManageAssigneeFilters,
@@ -36,6 +37,7 @@ const voiceCalls = ref([]);
 const voiceLoading = ref(false);
 const contactCenterContext = ref(null);
 const voiceError = ref(false);
+const isInitializing = ref(true);
 let accountGeneration = 0;
 let voiceGeneration = 0;
 
@@ -307,7 +309,7 @@ const openVoiceCall = call => {
       type: 'call',
       id: call.id,
     },
-    query: { ...route.query, channel: 'voice' },
+    query: route.query,
   });
 };
 
@@ -380,6 +382,7 @@ watch(
   async () => {
     accountGeneration += 1;
     const version = accountGeneration;
+    isInitializing.value = true;
     voiceGeneration += 1;
     page.value = 1;
     voiceCalls.value = [];
@@ -398,7 +401,12 @@ watch(
       ? route.query.channel
       : 'all';
 
-    await Promise.all([fetchConversations({ reset: true }), fetchVoiceCalls()]);
+    await Promise.all([
+      fetchConversations({ reset: true }).finally(() => {
+        if (version === accountGeneration) isInitializing.value = false;
+      }),
+      fetchVoiceCalls(),
+    ]);
   },
   { immediate: true }
 );
@@ -410,7 +418,32 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="flex h-full w-full bg-n-surface-1">
+  <HoyaInboxWorkspace
+    v-if="hasContactCenter"
+    :key="accountId"
+    :account-id="accountId"
+    :calls="voiceCalls"
+    :conversations="conversations"
+    :channels="channelFilterOptions"
+    :assignees="assigneeFilterOptions"
+    :assignee-filter="assigneeFilter"
+    :channel-filter="channelFilter"
+    :current-call-id="currentCallId"
+    :current-conversation-id="currentConversationId"
+    :inbox-for="inboxFor"
+    :context="contactCenterContext"
+    :loading="isCurrentListLoading"
+    :ready="!isInitializing"
+    :voice-error="voiceError"
+    :can-load-more="canLoadMore"
+    @select-call="openVoiceCall"
+    @select-conversation="openConversation"
+    @channel-change="setChannelFilter"
+    @assignee-change="setAssigneeFilter"
+    @load-more="loadMore"
+    @refresh="fetchVoiceCalls"
+  />
+  <section v-else class="flex h-full w-full bg-n-surface-1">
     <aside
       class="flex h-full w-full flex-col border-n-weak bg-n-solid-1 shadow-[6px_0_24px_rgba(8,43,82,0.04)] transition-[width,max-width,min-width] duration-200 ltr:border-r rtl:border-l"
       :class="[
@@ -658,6 +691,9 @@ onBeforeUnmount(() => {
       </div>
     </main>
 
-    <router-view v-else :key="`${accountId}-${currentConversationId}`" />
+    <router-view
+      v-else-if="!isInitializing"
+      :key="`${accountId}-${currentConversationId}`"
+    />
   </section>
 </template>

@@ -39,7 +39,7 @@ const CONNECTION_WATCHDOG_MS = 20000;
 
 let durationTimer;
 let callStartedAt;
-let activeAccountId;
+const activeAccountId = ref();
 let initializationPromise;
 let initializationVersion = 0;
 let reconnectTimer;
@@ -226,7 +226,7 @@ const run = async action => {
 
 const canReconnect = () =>
   Boolean(
-    activeAccountId &&
+    activeAccountId.value &&
       configured.value &&
       extensionEnabled.value &&
       !intentionalDisconnect &&
@@ -389,19 +389,19 @@ const disconnect = async () => {
   }
 };
 const turnOnExtension = async () => {
-  if (!activeAccountId) return undefined;
+  if (!activeAccountId.value) return undefined;
   extensionEnabled.value = true;
-  writeExtensionEnabled(activeAccountId, true);
+  writeExtensionEnabled(activeAccountId.value, true);
   reconnectAttempt = 0;
   return connect();
 };
 
 const turnOffExtension = async () => {
-  if (!activeAccountId || hasCall.value) return undefined;
+  if (!activeAccountId.value || hasCall.value) return undefined;
   clearReconnectTimer();
   reconnecting.value = false;
   extensionEnabled.value = false;
-  writeExtensionEnabled(activeAccountId, false);
+  writeExtensionEnabled(activeAccountId.value, false);
   await disconnect();
   status.value = 'Ramal desligado';
   statusTone.value = 'neutral';
@@ -547,20 +547,20 @@ const initialize = accountId => {
   if (!accountId) return Promise.resolve();
   attachFloatingBridge();
   attachNetworkListeners();
-  if (initializationPromise && activeAccountId === accountId) {
+  if (initializationPromise && activeAccountId.value === accountId) {
     return initializationPromise;
   }
-  if (activeAccountId === accountId && registered.value) {
+  if (activeAccountId.value === accountId && registered.value) {
     return Promise.resolve();
   }
 
   initializationVersion += 1;
   const version = initializationVersion;
   initializationPromise = (async () => {
-    if (activeAccountId && activeAccountId !== accountId) {
+    if (activeAccountId.value && activeAccountId.value !== accountId) {
       await disconnect();
     }
-    activeAccountId = accountId;
+    activeAccountId.value = accountId;
     disconnectRequested = false;
     reconnectBlocked = false;
     retryNotBefore = 0;
@@ -601,7 +601,7 @@ async function shutdown() {
   reconnecting.value = false;
   intentionalDisconnect = true;
   detachNetworkListeners();
-  activeAccountId = undefined;
+  activeAccountId.value = undefined;
   initializationVersion += 1;
   initializationPromise = undefined;
   try {
@@ -621,6 +621,7 @@ async function shutdown() {
 export const useSipWebphone = () => {
   attachFloatingBridge();
   return {
+    accountId: computed(() => activeAccountId.value),
     credential,
     loading,
     connecting,

@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, reactive } from 'vue';
 import { createStore } from 'vuex';
-import { flushPromises, mount } from '@vue/test-utils';
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils';
 import { INBOX_TYPES } from 'dashboard/helper/inbox';
 import JrcContactCenterAPI from 'dashboard/api/jrcContactCenter';
 import InboxList from './InboxList.vue';
@@ -14,8 +14,9 @@ vi.mock('vue-router', async importOriginal => ({
 }));
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: key => key }) }));
 vi.mock('dashboard/api/jrcContactCenter', () => ({
-  default: { calls: vi.fn(), context: vi.fn() },
+  default: { calls: vi.fn(), context: vi.fn(), agentState: vi.fn() },
 }));
+enableAutoUnmount(afterEach);
 
 const ConversationPanel = defineComponent({
   setup: () => ({ account: mocks.route.params.accountId }),
@@ -34,6 +35,7 @@ const mountInbox = () =>
     global: {
       plugins: [store],
       stubs: {
+        Dialog: { methods: { open() {}, close() {} }, template: '<div />' },
         RouterLink: {
           name: 'RouterLink',
           props: ['to'],
@@ -94,6 +96,7 @@ describe('omnichannel inbox', () => {
         filters: {},
       }),
       getters: {
+        getSelectedChat: () => ({}),
         getCurrentUser: state => state.currentUser,
         getCurrentRole: state =>
           state.currentUser.accounts.find(
@@ -126,6 +129,9 @@ describe('omnichannel inbox', () => {
       },
     });
     JrcContactCenterAPI.calls.mockResolvedValue({ data: { items: [call] } });
+    JrcContactCenterAPI.agentState.mockResolvedValue({
+      data: { item: { state: 'available' } },
+    });
     JrcContactCenterAPI.context.mockResolvedValue({
       data: { capabilities: { operate: true } },
     });
@@ -201,18 +207,16 @@ describe('omnichannel inbox', () => {
     );
     expect(wrapper.text()).toContain(call.ani);
     await wrapper
-      .findAll('button')
-      .find(b => b.text() === 'WhatsApp')
-      .trigger('click');
+      .get('select[aria-label="JRC_CONTACT_CENTER.INBOX.CHANNEL_FILTER_LABEL"]')
+      .setValue('whatsapp');
     await flushPromises();
     expect(
       wrapper.findAll('[data-testid="conversation"]').map(row => row.text())
     ).toEqual(['101']);
     expect(wrapper.text()).not.toContain(call.ani);
     await wrapper
-      .findAll('button')
-      .find(b => b.text() === 'JRC_CONTACT_CENTER.INBOX.CHANNELS.SOCIAL')
-      .trigger('click');
+      .get('select[aria-label="JRC_CONTACT_CENTER.INBOX.CHANNEL_FILTER_LABEL"]')
+      .setValue('social');
     await flushPromises();
     expect(
       wrapper.findAll('[data-testid="conversation"]').map(row => row.text())
@@ -236,14 +240,14 @@ describe('omnichannel inbox', () => {
     mocks.route.params.id = '7';
     await flushPromises();
     expect(wrapper.get('[data-testid="call-workspace"]').text()).toBe('1:7');
-    const backLink = wrapper
-      .findAllComponents({ name: 'RouterLink' })
-      .find(link => link.text() === 'JRC_CONTACT_CENTER.INBOX.BACK_TO_LIST');
-    expect(backLink.props('to')).toEqual({
-      name: 'inbox_view',
-      params: { accountId: 1 },
-      query: mocks.route.query,
-    });
+    const toggle = wrapper.get(
+      'button[aria-label="JRC_CONTACT_CENTER.INBOX_360.TOGGLE_LIST"]'
+    );
+    await toggle.trigger('click');
+    expect(toggle.attributes('aria-expanded')).toBe('true');
+    expect(wrapper.get('[data-testid="call-workspace"]').text()).toBe('1:7');
+    expect(mocks.route.params.accountId).toBe('1');
+    expect(mocks.route.query).toEqual({});
   });
 
   it('discards voice and conversation view state from the previous account', async () => {
@@ -333,5 +337,64 @@ describe('omnichannel inbox', () => {
     );
     expect(wrapper.find('[data-testid="loading"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="call-workspace"]').exists()).toBe(false);
+  });
+
+  it('renders the three regions, collapsible channel groups and the seven contextual tabs', async () => {
+    const wrapper = mountInbox();
+    await flushPromises();
+    ['inbox-list', 'interaction-workspace', 'customer-column'].forEach(
+      region => {
+        expect(wrapper.find(`[data-testid="${region}"]`).exists()).toBe(true);
+      }
+    );
+    const voiceGroup = wrapper.get('[data-channel="voice"] > button');
+    await voiceGroup.trigger('click');
+    expect(voiceGroup.attributes('aria-expanded')).toBe('false');
+    expect(wrapper.text()).not.toContain(call.ani);
+    await voiceGroup.trigger('click');
+    expect(wrapper.text()).toContain(call.ani);
+    const tabs = wrapper
+      .get('nav[aria-label="JRC_CONTACT_CENTER.INBOX_360.WORKSPACE_TABS"]')
+      .findAll('button');
+    expect(tabs).toHaveLength(7);
+    await tabs[3].trigger('click');
+    expect(tabs[3].attributes('aria-pressed')).toBe('true');
+    expect(wrapper.text()).toContain(
+      'JRC_CONTACT_CENTER.INBOX_360.ORDERS_EMPTY'
+    );
+  });
+
+  it('waits for list bootstrap before mounting a directly linked conversation', async () => {
+    mocks.route.params = { accountId: '1', type: 'conversation', id: '101' };
+    let resolveList;
+    const dispatch = store.dispatch.bind(store);
+    vi.spyOn(store, 'dispatch').mockImplementation((type, ...args) =>
+      type === 'fetchAllConversations'
+        ? new Promise(resolve => {
+            resolveList = resolve;
+          })
+        : dispatch(type, ...args)
+    );
+    const wrapper = mountInbox();
+    await flushPromises();
+    expect(wrapper.find('[data-testid="conversation-panel"]').exists()).toBe(
+      false
+    );
+    expect(store.state.filters.assigneeType).toBe('me');
+    resolveList();
+    await flushPromises();
+    expect(wrapper.get('[data-testid="conversation-panel"]').text()).toBe('1');
+  });
+
+  it('opens a messaging conversation without dropping the authorized account or filter', async () => {
+    store.state.conversationPayload = [{ id: 101, inbox_id: 11, meta: {} }];
+    const wrapper = mountInbox();
+    await flushPromises();
+    await wrapper.get('[data-testid="conversation"]').trigger('click');
+    expect(mocks.router.push).toHaveBeenCalledWith({
+      name: 'inbox_view_conversation',
+      params: { accountId: '1', type: 'conversation', id: 101 },
+      query: mocks.route.query,
+    });
   });
 });

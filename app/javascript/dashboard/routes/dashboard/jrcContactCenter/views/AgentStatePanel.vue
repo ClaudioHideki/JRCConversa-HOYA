@@ -1,37 +1,43 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import JrcContactCenterAPI from 'dashboard/api/jrcContactCenter';
 import VisualStatusBadge from '../components/visual/VisualStatusBadge.vue';
-import { agentStateLabels } from '../agentStateLabels';
+import { agentStateLabels, pauseReasonLabels } from '../agentStateLabels';
 
 const props = defineProps({
   accountId: { type: [String, Number], required: true },
   canOperate: { type: Boolean, default: false },
+  compact: { type: Boolean, default: false },
 });
+const emit = defineEmits(['stateChange']);
 const { t } = useI18n();
+const state = ref(null);
+const now = ref(Date.now());
+const clock = setInterval(() => {
+  now.value = Date.now();
+}, 1000);
+const pauseElapsed = computed(() => {
+  const seconds =
+    Math.max(
+      0,
+      Math.floor(
+        (now.value - new Date(state.value?.started_at).getTime()) / 1000
+      )
+    ) || 0;
+  return [
+    Math.floor(seconds / 3600),
+    Math.floor(seconds / 60) % 60,
+    seconds % 60,
+  ]
+    .map(value => String(value).padStart(2, '0'))
+    .join(':');
+});
 const labels = computed(() => agentStateLabels(t));
 const pauseReasons = computed(() =>
-  Object.entries({
-    bathroom: t('JRC_CONTACT_CENTER.AGENT.PAUSE_REASONS.bathroom'),
-    coffee: t('JRC_CONTACT_CENTER.AGENT.PAUSE_REASONS.coffee'),
-    lunch: t('JRC_CONTACT_CENTER.AGENT.PAUSE_REASONS.lunch'),
-    meeting: t('JRC_CONTACT_CENTER.AGENT.PAUSE_REASONS.meeting'),
-    training: t('JRC_CONTACT_CENTER.AGENT.PAUSE_REASONS.training'),
-    feedback: t('JRC_CONTACT_CENTER.AGENT.PAUSE_REASONS.feedback'),
-    backoffice: t('JRC_CONTACT_CENTER.AGENT.PAUSE_REASONS.backoffice'),
-    internal_support: t(
-      'JRC_CONTACT_CENTER.AGENT.PAUSE_REASONS.internal_support'
-    ),
-    technical_issue: t(
-      'JRC_CONTACT_CENTER.AGENT.PAUSE_REASONS.technical_issue'
-    ),
-    rest: t('JRC_CONTACT_CENTER.AGENT.PAUSE_REASONS.rest'),
-    end_shift: t('JRC_CONTACT_CENTER.AGENT.PAUSE_REASONS.end_shift'),
-  }).map(([code, label]) => ({ code, label }))
+  Object.entries(pauseReasonLabels(t)).map(([code, label]) => ({ code, label }))
 );
-const state = ref(null);
 const busy = ref(false);
 const failed = ref(false);
 const reason = ref('');
@@ -123,6 +129,11 @@ const transition = async nextState => {
 };
 
 watch(() => props.accountId, load, { immediate: true });
+watch(state, value => emit('stateChange', value));
+onBeforeUnmount(() => {
+  generation += 1;
+  clearInterval(clock);
+});
 </script>
 
 <template>
@@ -147,7 +158,11 @@ watch(() => props.accountId, load, { immediate: true });
             {{ t('JRC_CONTACT_CENTER.AGENT.TITLE') }}
           </h3>
           <p class="mt-1 text-xs leading-5 text-n-slate-10">
-            {{ t('JRC_CONTACT_CENTER.AGENT.LOCAL_INTENT') }}
+            {{
+              compact
+                ? t('JRC_CONTACT_CENTER.INBOX_360.PAUSE_HINT')
+                : t('JRC_CONTACT_CENTER.AGENT.LOCAL_INTENT')
+            }}
           </p>
         </div>
       </div>
@@ -188,6 +203,19 @@ watch(() => props.accountId, load, { immediate: true });
           <p class="mt-3 text-lg font-bold text-n-slate-12">
             {{ labels[state.state] }}
           </p>
+          <p
+            v-if="state.state === 'paused'"
+            class="mt-2 text-sm font-medium text-n-amber-11"
+            role="timer"
+          >
+            {{
+              t('JRC_CONTACT_CENTER.COMMON.CODE_DETAIL', {
+                code: pauseReasons.find(item => item.code === state.reason_code)
+                  ?.label,
+                detail: pauseElapsed,
+              })
+            }}
+          </p>
           <p class="mt-1 text-xs leading-5 text-n-slate-10">
             {{
               state.eligible
@@ -215,7 +243,9 @@ watch(() => props.accountId, load, { immediate: true });
               {{
                 state.provider_confirmed
                   ? t('JRC_CONTACT_CENTER.STATUS.READY')
-                  : t('JRC_CONTACT_CENTER.STATUS.PENDING_CONTRACT')
+                  : compact
+                    ? t('JRC_CONTACT_CENTER.INBOX_360.PHONE_CONFIRMATION')
+                    : t('JRC_CONTACT_CENTER.STATUS.PENDING_CONTRACT')
               }}
             </span>
           </div>
@@ -281,7 +311,11 @@ watch(() => props.accountId, load, { immediate: true });
               @click="transition(item.state)"
             >
               <Icon :icon="item.icon" class="size-4" />
-              {{ labels[item.state] }}
+              {{
+                item.state === 'available' && state.state === 'paused'
+                  ? t('JRC_CONTACT_CENTER.INBOX_360.RESUME')
+                  : labels[item.state]
+              }}
             </button>
           </div>
         </div>

@@ -64,6 +64,13 @@ describe('softphone reconnect coordinator', () => {
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
+  it('exposes the active Account reactively and clears it on shutdown', async () => {
+    expect(api.accountId.value).toBe(1);
+    await api.initialize(2);
+    expect(api.accountId.value).toBe(2);
+    await api.shutdown();
+    expect(api.accountId.value).toBeUndefined();
+  });
   it('reconnects after Registered to Unregistered without a transport disconnect', async () => {
     mock.callbacks.onRegister('Unregistered');
     expect(api.reconnecting.value).toBe(true);

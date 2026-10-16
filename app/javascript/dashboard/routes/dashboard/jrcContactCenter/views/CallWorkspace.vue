@@ -1,18 +1,29 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import JrcContactCenterAPI from 'dashboard/api/jrcContactCenter';
 import VisualSectionCard from '../components/visual/VisualSectionCard.vue';
 import VisualStatusBadge from '../components/visual/VisualStatusBadge.vue';
+import { callStateLabels } from '../../inbox/inboxPresentation';
 
 const props = defineProps({
   accountId: { type: [String, Number], required: true },
   callId: { type: [String, Number], required: true },
   context: { type: Object, default: () => ({}) },
+  compact: { type: Boolean, default: false },
+  section: { type: String, default: 'all' },
 });
-const emit = defineEmits(['created']);
-const { t } = useI18n();
+const emit = defineEmits(['created', 'loaded']);
+const { t, locale } = useI18n();
+const callLabels = computed(() => callStateLabels(t));
+const journeyTime = value =>
+  props.compact && value
+    ? new Intl.DateTimeFormat(locale.value.replace('_', '-'), {
+        dateStyle: 'short',
+        timeStyle: 'short',
+      }).format(new Date(value))
+    : value;
 const actionLabels = computed(() => ({
   transfer_blind: t('JRC_CONTACT_CENTER.CALL.transfer_blind'),
   transfer_attended: t('JRC_CONTACT_CENTER.CALL.transfer_attended'),
@@ -66,14 +77,18 @@ const journeyEvents = computed(() => [
     icon: 'i-lucide-git-branch',
     title: event.menu_key || t('JRC_CONTACT_CENTER.VISUAL.IVR'),
     detail: event.option_key || '-',
-    time: event.occurred_at,
+    time: journeyTime(event.occurred_at),
   })),
   ...(call.value?.journey?.legs || []).map(leg => ({
     id: `leg-${leg.id}`,
     icon: 'i-lucide-phone-call',
-    title: `Perna ${leg.id}`,
-    detail: `${leg.status} · Fila ${leg.queue_id || '-'}`,
-    time: leg.started_at || leg.created_at,
+    title: props.compact
+      ? t('JRC_CONTACT_CENTER.INBOX_360.AGENT_LEG')
+      : `Perna ${leg.id}`,
+    detail: props.compact
+      ? callLabels.value[leg.status]
+      : `${leg.status} · Fila ${leg.queue_id || '-'}`,
+    time: journeyTime(leg.started_at || leg.created_at),
   })),
 ]);
 
@@ -90,6 +105,7 @@ const load = async () => {
   scheduledAt.value = '';
   destination.value = '';
   busy.value = true;
+  emit('loaded', null);
   try {
     const [callResponse, agentResponse] = await Promise.all([
       JrcContactCenterAPI.call(props.accountId, props.callId),
@@ -105,6 +121,12 @@ const load = async () => {
       );
       if (version === generation) customer.value = response.data;
     }
+    if (version === generation)
+      emit('loaded', {
+        call: call.value,
+        customer: customer.value,
+        agent: agent.value,
+      });
   } catch {
     if (version === generation) failed.value = true;
   } finally {
@@ -187,6 +209,14 @@ const command = async action => {
 };
 
 watch(() => [props.accountId, props.callId], load, { immediate: true });
+onBeforeUnmount(() => {
+  generation += 1;
+});
+defineExpose({
+  setCategory: value => {
+    category.value = value;
+  },
+});
 </script>
 
 <template>
@@ -194,6 +224,7 @@ watch(() => [props.accountId, props.callId], load, { immediate: true });
     class="overflow-hidden rounded-[28px] border border-n-weak bg-n-solid-2 shadow-[0_18px_48px_rgba(15,46,82,.12)]"
   >
     <header
+      v-if="!compact"
       class="relative overflow-hidden bg-gradient-to-r from-[#102e55] via-[#174f7f] to-[#087cc9] p-5 text-white sm:p-6"
     >
       <span
@@ -269,11 +300,18 @@ watch(() => [props.accountId, props.callId], load, { immediate: true });
         />
       </div>
 
-      <div v-else-if="call" class="grid gap-5 2xl:grid-cols-3">
+      <div
+        v-else-if="call"
+        class="grid gap-4"
+        :class="compact ? '' : '2xl:grid-cols-3'"
+      >
         <VisualSectionCard
+          v-if="!compact || section === 'journey'"
           :title="$t('JRC_CONTACT_CENTER.VISUAL.JORNADA_DA_CHAMADA')"
           :subtitle="
-            $t('JRC_CONTACT_CENTER.VISUAL.URA_FILA_PERNAS_E_TRANSFERENCIAS')
+            compact
+              ? ''
+              : $t('JRC_CONTACT_CENTER.VISUAL.URA_FILA_PERNAS_E_TRANSFERENCIAS')
           "
           icon="i-lucide-workflow"
         >
@@ -312,7 +350,7 @@ watch(() => [props.accountId, props.callId], load, { immediate: true });
             }}
           </div>
           <p
-            v-if="!sipAvailable"
+            v-if="!sipAvailable && !compact"
             class="mt-4 flex gap-2 rounded-xl border border-n-amber-5 bg-n-amber-2 p-3 text-xs leading-5 text-n-amber-11"
           >
             <Icon icon="i-lucide-clock-3" class="mt-0.5 size-4 shrink-0" />
@@ -321,11 +359,14 @@ watch(() => [props.accountId, props.callId], load, { immediate: true });
         </VisualSectionCard>
 
         <VisualSectionCard
+          v-if="!compact"
           :title="$t('JRC_CONTACT_CENTER.VISUAL.CLIENTE_E_OTICA_360')"
           :subtitle="
-            $t(
-              'JRC_CONTACT_CENTER.VISUAL.IDENTIFICACAO_EMPRESA_E_CONTEXTO_AUTORIZADO'
-            )
+            compact
+              ? ''
+              : $t(
+                  'JRC_CONTACT_CENTER.VISUAL.IDENTIFICACAO_EMPRESA_E_CONTEXTO_AUTORIZADO'
+                )
           "
           icon="i-lucide-orbit"
         >
@@ -385,12 +426,14 @@ watch(() => [props.accountId, props.callId], load, { immediate: true });
 
         <div class="space-y-5">
           <VisualSectionCard
-            v-if="canOperate"
+            v-if="canOperate && (!compact || section === 'transfer')"
             :title="$t('JRC_CONTACT_CENTER.VISUAL.TRANSFERENCIA_CONTEXTUAL')"
             :subtitle="
-              $t(
-                'JRC_CONTACT_CENTER.VISUAL.DESTINO_E_COMANDO_CONFIRMADOS_PELO_PROVIDER'
-              )
+              compact
+                ? ''
+                : $t(
+                    'JRC_CONTACT_CENTER.VISUAL.DESTINO_E_COMANDO_CONFIRMADOS_PELO_PROVIDER'
+                  )
             "
             icon="i-lucide-arrow-left-right"
           >
@@ -421,10 +464,14 @@ watch(() => [props.accountId, props.callId], load, { immediate: true });
           </VisualSectionCard>
 
           <VisualSectionCard
-            v-if="canOperate"
+            v-if="canOperate && (!compact || section === 'case')"
             :title="$t('JRC_CONTACT_CENTER.VISUAL.REGISTRAR_OCORRENCIA')"
             :subtitle="
-              $t('JRC_CONTACT_CENTER.VISUAL.OCORRENCIA_NATIVA_SEM_SERVICE_DESK')
+              compact
+                ? ''
+                : $t(
+                    'JRC_CONTACT_CENTER.VISUAL.OCORRENCIA_NATIVA_SEM_SERVICE_DESK'
+                  )
             "
             icon="i-lucide-clipboard-plus"
           >
@@ -455,10 +502,12 @@ watch(() => [props.accountId, props.callId], load, { immediate: true });
           </VisualSectionCard>
 
           <VisualSectionCard
-            v-if="canOperate"
+            v-if="canOperate && (!compact || section === 'callback')"
             :title="$t('JRC_CONTACT_CENTER.VISUAL.CALLBACK')"
             :subtitle="
-              $t('JRC_CONTACT_CENTER.VISUAL.AGENDA_INTEGRADA_E_IDEMPOTENTE')
+              compact
+                ? ''
+                : $t('JRC_CONTACT_CENTER.VISUAL.AGENDA_INTEGRADA_E_IDEMPOTENTE')
             "
             icon="i-lucide-calendar-clock"
           >

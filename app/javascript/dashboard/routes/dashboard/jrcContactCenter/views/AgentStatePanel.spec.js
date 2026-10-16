@@ -1,7 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils';
 import JrcContactCenterAPI from 'dashboard/api/jrcContactCenter';
 import AgentStatePanel from './AgentStatePanel.vue';
+enableAutoUnmount(afterEach);
+afterEach(() => vi.useRealTimers());
 
 vi.mock('dashboard/api/jrcContactCenter', () => ({
   default: { agentState: vi.fn(), updateAgentState: vi.fn() },
@@ -25,6 +27,49 @@ describe('AgentStatePanel', () => {
     JrcContactCenterAPI.agentState.mockResolvedValue({
       data: { item: initialState },
     });
+  });
+
+  it('shows structured reason, pause time and native resume with optimistic version checking', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-16T12:00:00Z'));
+    JrcContactCenterAPI.agentState.mockResolvedValue({
+      data: {
+        item: {
+          ...initialState,
+          state: 'paused',
+          reason_code: 'coffee',
+          started_at: '2026-10-16T11:59:50Z',
+          state_version: '4',
+        },
+      },
+    });
+    JrcContactCenterAPI.updateAgentState.mockResolvedValue({
+      data: {
+        item: { ...initialState, state: 'available', state_version: '5' },
+      },
+    });
+    const wrapper = mount(AgentStatePanel, {
+      props: { accountId: 1, canOperate: true },
+    });
+    await flushPromises();
+    expect(wrapper.get('[role="timer"]').text()).toContain('00:00:10');
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(wrapper.get('[role="timer"]').text()).toContain('00:00:12');
+    expect(
+      wrapper.get('select[aria-label="JRC_CONTACT_CENTER.AGENT.REASON"]')
+        .element.value
+    ).toBe('coffee');
+    await wrapper.findAll('button')[0].trigger('click');
+    await flushPromises();
+    expect(JrcContactCenterAPI.updateAgentState).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        state: 'available',
+        expected_state_version: '4',
+      })
+    );
+    expect(wrapper.emitted('stateChange').at(-1)[0].state).toBe('available');
+    expect(wrapper.find('[role="timer"]').exists()).toBe(false);
   });
 
   it('shows local intent and does not offer writes to a read-only operator', async () => {
