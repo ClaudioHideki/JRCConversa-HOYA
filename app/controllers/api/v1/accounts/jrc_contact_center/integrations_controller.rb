@@ -1,6 +1,11 @@
 # frozen_string_literal: true
 
 class Api::V1::Accounts::JrcContactCenter::IntegrationsController < Api::V1::Accounts::JrcContactCenter::BaseController
+  def health
+    authorize_contact_center!(:control?)
+    render json: base_payload.merge(JrcContactCenter::OperationalHealth.new(account: Current.account).call)
+  end
+
   def capabilities
     authorize_contact_center!(:control?)
     adapter = JrcContactCenter::Providers::JrcPabxAdapter.new(account: Current.account)

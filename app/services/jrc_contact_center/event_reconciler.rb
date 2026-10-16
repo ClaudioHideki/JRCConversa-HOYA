@@ -10,7 +10,9 @@ class JrcContactCenter::EventReconciler
     'agent.state.changed' => :process_agent_state,
     'coe.fallback.triggered' => :process_fallback,
     'recording.available' => :process_recording
-  }.freeze
+  }.merge(JrcContactCenter::CallJourney::EVENT_TYPES.excluding('call.created', 'call.answered', 'call.ended')
+                                                  .index_with { :process_journey })
+                   .merge('command.confirmed' => :process_command_confirmation, 'command.rejected' => :process_command_confirmation).freeze
   SUPPORTED_TYPES = EVENT_HANDLERS.keys.freeze
 
   def initialize(event_record:)
@@ -40,18 +42,26 @@ class JrcContactCenter::EventReconciler
   private
 
   def reconcile_supported_event
-    JrcContactCenter::ApplicationRecord.transaction(requires_new: true) { process_supported_event }
+    JrcContactCenter::ApplicationRecord.transaction(requires_new: true) do
+      @account.with_lock { process_supported_event }
+    end
     @event_record.update!(status: 'processed', processed_at: Time.current, last_error: nil)
   rescue StandardError => e
     @event_record.update!(status: 'failed', last_error: e.message.truncate(2000))
   end
 
   def process_supported_event
+    raise JrcContactCenter::OperationError, 'unsupported_event_schema' unless @event_record.schema_version == '1.0'
+    return if stale_answer?
+
     send(EVENT_HANDLERS.fetch(@event_record.event_type))
+    process_journey if %w[call.created call.answered call.ended].include?(@event_record.event_type)
+    project_session if @event_record.event_type.start_with?('call.', 'queue.', 'recording.', 'coe.')
   end
 
   def process_call_answered
-    update_session('connected', answered_at: @event_record.occurred_at)
+    session = find_session!
+    update_session('connected', answered_at: [session.answered_at, @event_record.occurred_at].compact.min)
   end
 
   def process_call_ended
@@ -78,7 +88,7 @@ class JrcContactCenter::EventReconciler
       ani: session.ani.presence || value('ani'),
       dnis: session.dnis.presence || value('dnis'),
       started_at: [session.started_at, @event_record.occurred_at].compact.min,
-      metadata: session.metadata.to_h.merge(payload_body)
+      metadata: session.metadata.to_h.merge(payload_body.except('jrc_f1'))
     }
   end
 
@@ -116,16 +126,32 @@ class JrcContactCenter::EventReconciler
 
   def process_agent_state
     account_user = @account.account_users.find(value('account_user_id'))
-    JrcContactCenter::AgentStateEvent.create!(
-      account: @account,
-      account_user: account_user,
-      external_event_id: @event_record.external_event_id,
-      state: value('state'),
-      reason_code: value('reason_code'),
-      source: @event_record.provider,
-      started_at: @event_record.occurred_at,
-      metadata: payload_body
+    JrcContactCenter::AgentStateManager.new(account: @account, account_user: account_user).record_provider_event(
+      state: value('state'), queue_id: value('queue_id'), reason_code: value('reason_code'), provider: @event_record.provider,
+      occurred_at: @event_record.occurred_at, external_event_id: @event_record.external_event_id,
+      metadata: payload_body.except('provider_confirmed', 'jrc_call_session_id')
     )
+  end
+
+  def process_journey
+    JrcContactCenter::CallJourney.new(event_record: @event_record).call
+  end
+
+  def process_command_confirmation
+    JrcContactCenter::CommandConfirmation.new(event_record: @event_record).call
+  end
+
+  def stale_answer?
+    return false unless @event_record.event_type == 'call.answered'
+
+    session = find_session!
+    last = session.f1_data['state_at']
+    %w[ended failed].exclude?(session.status) && last && @event_record.occurred_at < Time.iso8601(last)
+  end
+
+  def project_session
+    session = find_session
+    JrcContactCenter::FactsProjector.new(account: @account).call(session.id) if session
   end
 
   def process_fallback

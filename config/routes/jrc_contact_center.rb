@@ -4,6 +4,12 @@ namespace :api, defaults: { format: 'json' } do
       namespace :jrc_contact_center, module: 'accounts/jrc_contact_center' do
         get 'context', to: 'context#show'
         get 'customer_context', to: 'customer_context#show'
+        resource :agent_state, only: %i[show update], controller: 'agent_states'
+        get 'supervisor', to: 'supervisor#show'
+        resources :commands, only: %i[index show create]
+        resources :events, only: [:index] do
+          post :reprocess, on: :member
+        end
         resources :units, only: %i[index create update]
         resources :queues, only: %i[index create update]
         resources :queue_memberships, only: %i[index create update]
@@ -13,6 +19,7 @@ namespace :api, defaults: { format: 'json' } do
         resources :routing_rules, only: %i[index create update]
         get 'reports/summary', to: 'reports#summary'
         get 'integrations/capabilities', to: 'integrations#capabilities'
+        get 'integrations/health', to: 'integrations#health'
       end
     end
   end

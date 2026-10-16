@@ -6,6 +6,39 @@ const baseMeta = {
   permissions: ['administrator', 'agent', 'jrc_contact_center_view'],
 };
 
+const supervisorMeta = {
+  ...baseMeta,
+  permissions: ['administrator', 'jrc_contact_center_supervise'],
+};
+
+const managementMeta = {
+  ...baseMeta,
+  permissions: [
+    'administrator',
+    'jrc_contact_center_supervise',
+    'jrc_contact_center_configure',
+  ],
+};
+
+const reportsMeta = {
+  ...baseMeta,
+  permissions: [
+    'administrator',
+    'jrc_contact_center_reports',
+    'jrc_contact_center_supervise',
+  ],
+};
+
+const configureMeta = {
+  ...baseMeta,
+  permissions: ['administrator', 'jrc_contact_center_configure'],
+};
+
+const visualPage = screenKey => ({
+  component: () => import('./views/visual/VisualExperiencePage.vue'),
+  props: { screenKey },
+});
+
 export const routes = [
   {
     path: frontendURL('accounts/:accountId/contact-center'),
@@ -20,26 +53,16 @@ export const routes = [
         meta: baseMeta,
       },
       {
-        path: 'supervisor',
-        name: 'jrc_contact_center_supervisor',
-        component: () => import('./views/SupervisorPage.vue'),
-        meta: {
-          ...baseMeta,
-          permissions: ['administrator', 'jrc_contact_center_supervise'],
-        },
+        path: 'chamada/:callId?',
+        name: 'jrc_contact_center_call',
+        component: () => import('./views/visual/CallExperiencePage.vue'),
+        meta: baseMeta,
       },
       {
-        path: 'control-desk',
-        name: 'jrc_contact_center_control_desk',
-        component: () => import('./views/ControlDeskPage.vue'),
-        meta: {
-          ...baseMeta,
-          permissions: [
-            'administrator',
-            'jrc_contact_center_supervise',
-            'jrc_contact_center_configure',
-          ],
-        },
+        path: 'pos-atendimento',
+        name: 'jrc_contact_center_after_call',
+        ...visualPage('afterCall'),
+        meta: baseMeta,
       },
       {
         path: 'ocorrencias',
@@ -48,26 +71,88 @@ export const routes = [
         meta: baseMeta,
       },
       {
+        path: 'cliente-360/:customerId?',
+        name: 'jrc_contact_center_customer_360',
+        ...visualPage('customer360'),
+        meta: baseMeta,
+      },
+      {
+        path: 'supervisor',
+        name: 'jrc_contact_center_supervisor',
+        component: () => import('./views/SupervisorPage.vue'),
+        meta: supervisorMeta,
+      },
+      {
+        path: 'financeiro',
+        name: 'jrc_contact_center_finance',
+        ...visualPage('finance'),
+        meta: managementMeta,
+      },
+      {
+        path: 'coes',
+        name: 'jrc_contact_center_coes',
+        ...visualPage('coes'),
+        meta: managementMeta,
+      },
+      {
+        path: 'control-desk',
+        name: 'jrc_contact_center_control_desk',
+        component: () => import('./views/ControlDeskPage.vue'),
+        meta: managementMeta,
+      },
+      {
+        path: 'ura',
+        name: 'jrc_contact_center_ivr',
+        ...visualPage('ivrBuilder'),
+        meta: configureMeta,
+      },
+      {
+        path: 'ura/pedidos',
+        name: 'jrc_contact_center_order_lookup',
+        ...visualPage('orderLookup'),
+        meta: managementMeta,
+      },
+      {
+        path: 'pabx',
+        name: 'jrc_contact_center_pabx',
+        ...visualPage('pabxMonitor'),
+        meta: managementMeta,
+      },
+      {
+        path: 'gravacoes',
+        name: 'jrc_contact_center_recordings',
+        ...visualPage('recordings'),
+        meta: reportsMeta,
+      },
+      {
         path: 'relatorios',
         name: 'jrc_contact_center_reports',
         component: () => import('./views/ReportsPage.vue'),
-        meta: {
-          ...baseMeta,
-          permissions: [
-            'administrator',
-            'jrc_contact_center_reports',
-            'jrc_contact_center_supervise',
-          ],
-        },
+        meta: reportsMeta,
+      },
+      {
+        path: 'pesquisas',
+        name: 'jrc_contact_center_surveys',
+        ...visualPage('surveys'),
+        meta: reportsMeta,
+      },
+      {
+        path: 'seguranca',
+        name: 'jrc_contact_center_security',
+        ...visualPage('security'),
+        meta: configureMeta,
+      },
+      {
+        path: 'migracao',
+        name: 'jrc_contact_center_migration',
+        ...visualPage('migration'),
+        meta: configureMeta,
       },
       {
         path: 'configuracoes',
         name: 'jrc_contact_center_settings',
         component: () => import('./views/SettingsPage.vue'),
-        meta: {
-          ...baseMeta,
-          permissions: ['administrator', 'jrc_contact_center_configure'],
-        },
+        meta: configureMeta,
       },
     ],
   },

@@ -13,4 +13,17 @@ class JrcContactCenter::CallLeg < JrcContactCenter::ApplicationRecord
   validates :external_leg_id, uniqueness: { scope: :account_id, allow_nil: true }
   validates :direction, inclusion: { in: DIRECTIONS }
   validates :status, inclusion: { in: STATUSES }
+  validate :timestamps_are_monotonic
+
+  private
+
+  def timestamps_are_monotonic
+    errors.add(:answered_at, 'must not be before started_at') if precedes?(answered_at, started_at)
+    errors.add(:ended_at, 'must not be before started_at') if precedes?(ended_at, started_at)
+    errors.add(:ended_at, 'must not be before answered_at') if precedes?(ended_at, answered_at)
+  end
+
+  def precedes?(timestamp, lower_bound)
+    timestamp && lower_bound && timestamp < lower_bound
+  end
 end

@@ -28,10 +28,21 @@ const BackofficeView = () => import('./views/backoffice/BackofficeView.vue');
 const ManagementView = () => import('./views/management/ManagementView.vue');
 const CrmSettingsView = () => import('./views/settings/CrmSettingsView.vue');
 
+const CrmFieldLayout = () => import('./views/field/CrmFieldLayout.vue');
+const CrmFieldPage = () => import('./views/field/CrmFieldPage.vue');
+
 const meta = {
   featureFlag: FEATURE_FLAGS.JRC_CRM,
   permissions: ['administrator', 'agent', 'custom_role'],
 };
+
+const fieldPage = (path, name, screenKey) => ({
+  path,
+  name,
+  component: CrmFieldPage,
+  props: { screenKey },
+  meta,
+});
 
 const ensureCrmEnabled = async to => {
   await store.dispatch('accounts/get', { silent: true });
@@ -79,6 +90,45 @@ export default {
           meta,
         },
         { path: 'wallet', name: 'crm_wallet', component: WalletView, meta },
+
+        {
+          path: 'field',
+          component: CrmFieldLayout,
+          meta,
+          children: [
+            { path: '', redirect: { name: 'crm_field_my_day' } },
+            fieldPage('meu-dia', 'crm_field_my_day', 'myDay'),
+            fieldPage('agenda', 'crm_field_calendar', 'calendar'),
+            fieldPage('mapa', 'crm_field_map', 'map'),
+            fieldPage('visitas/nova', 'crm_field_new_visit', 'newVisit'),
+            fieldPage(
+              'visitas/relatorio',
+              'crm_field_visit_report',
+              'visitReport'
+            ),
+            fieldPage('carteira', 'crm_field_wallet', 'wallet'),
+            fieldPage('cliente-360', 'crm_field_customer_360', 'customer360'),
+            fieldPage(
+              'oportunidades',
+              'crm_field_opportunities',
+              'opportunities'
+            ),
+            fieldPage('pedidos', 'crm_field_orders', 'orders'),
+            fieldPage('tarefas', 'crm_field_tasks', 'tasks'),
+            fieldPage('divulgacao', 'crm_field_promotion', 'promotion'),
+            fieldPage('treinamentos', 'crm_field_training', 'training'),
+            fieldPage('catalogo', 'crm_field_catalog', 'catalog'),
+            fieldPage('telefonia', 'crm_field_phone', 'phone'),
+            fieldPage('nico', 'crm_field_nico', 'nico'),
+            fieldPage(
+              'notificacoes',
+              'crm_field_notifications',
+              'notifications'
+            ),
+            fieldPage('gestao-regional', 'crm_field_regional', 'regional'),
+            fieldPage('relatorios', 'crm_field_reports', 'reports'),
+          ],
+        },
         {
           path: 'activities',
           name: 'crm_activities',

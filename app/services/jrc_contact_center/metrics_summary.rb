@@ -19,6 +19,20 @@ class JrcContactCenter::MetricsSummary
     facts = @scope.where(fact_date: @from..@to)
     totals = JrcContactCenter::DailyFact::COUNTERS.index_with { |column| facts.sum(column) }
     durations = JrcContactCenter::DailyFact::DURATIONS.index_with { |column| facts.sum(column) }
-    totals.merge(durations).merge(from: @from, to: @to)
+    totals.merge(durations).merge(averages(facts)).merge(from: @from, to: @to, sla: nil)
+  end
+
+  private
+
+  def averages(facts)
+    { tme_seconds: average(facts, 'wait_measured_count', 'wait_measured_seconds'),
+      tma_seconds: average(facts, 'talk_measured_count', 'talk_measured_seconds'),
+      acw_average_seconds: average(facts, 'acw_completed_count', 'acw_measured_seconds') }
+  end
+
+  def average(facts, key, total_key)
+    count = facts.sum(Arel.sql("COALESCE((data ->> '#{key}')::bigint, 0)"))
+    total = facts.sum(Arel.sql("COALESCE((data ->> '#{total_key}')::bigint, 0)"))
+    count.positive? ? (total.to_f / count).round(2) : nil
   end
 end

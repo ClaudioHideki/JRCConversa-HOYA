@@ -1159,10 +1159,22 @@ const menuItems = computed(() => {
         'ramal_index',
         'calls_dashboard_index',
         'jrc_contact_center_cockpit',
-        'jrc_contact_center_supervisor',
-        'jrc_contact_center_control_desk',
+        'jrc_contact_center_call',
+        'jrc_contact_center_after_call',
         'jrc_contact_center_occurrences',
+        'jrc_contact_center_customer_360',
+        'jrc_contact_center_supervisor',
+        'jrc_contact_center_finance',
+        'jrc_contact_center_coes',
+        'jrc_contact_center_control_desk',
+        'jrc_contact_center_ivr',
+        'jrc_contact_center_order_lookup',
+        'jrc_contact_center_pabx',
+        'jrc_contact_center_recordings',
         'jrc_contact_center_reports',
+        'jrc_contact_center_surveys',
+        'jrc_contact_center_security',
+        'jrc_contact_center_migration',
         'jrc_contact_center_settings',
       ],
       children: [
@@ -1642,7 +1654,7 @@ const menuSections = computed(() => {
       class="pointer-events-none absolute inset-0 bg-[url('/brand-assets/jrc-background.jpeg')] bg-cover bg-center opacity-[0.08]"
     />
     <section
-      class="relative z-10 grid"
+      class="relative z-20 grid"
       :class="isEffectivelyCollapsed ? 'mt-3 mb-6 gap-4' : 'mt-4 mb-5 gap-4'"
     >
       <div

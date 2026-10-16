@@ -1,214 +1,241 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
-import { useRoute } from 'vue-router';
+import { computed, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
+import Icon from 'dashboard/components-next/icon/Icon.vue';
 import JrcContactCenterAPI from 'dashboard/api/jrcContactCenter';
+import VisualShowcasePage from '../components/visual/VisualShowcasePage.vue';
+import VisualSectionCard from '../components/visual/VisualSectionCard.vue';
+import VisualStatusBadge from '../components/visual/VisualStatusBadge.vue';
+import { contactCenterScreen } from '../demo/contactCenterVisualCatalog';
+import AgentStatePanel from './AgentStatePanel.vue';
+import CallWorkspace from './CallWorkspace.vue';
 
 const route = useRoute();
+const router = useRouter();
 const { t } = useI18n();
 const loading = ref(true);
 const failed = ref(false);
 const context = ref(null);
 const calls = ref([]);
 const callbacks = ref([]);
+const selectedCallId = ref(null);
+let generation = 0;
 
 const accountId = computed(() => route.params.accountId);
 const selectedCallbackId = computed(() => String(route.query.callbackId || ''));
-const cards = computed(() => {
+
+const cockpitScreen = computed(() => {
+  const source = contactCenterScreen('cockpit', t);
   const counts = context.value?.counts || {};
-  return [
-    [t('JRC_CONTACT_CENTER.CARDS.UNITS'), counts.units ?? 0],
-    [t('JRC_CONTACT_CENTER.CARDS.QUEUES'), counts.queues ?? 0],
-    [t('JRC_CONTACT_CENTER.CARDS.ACTIVE_CALLS'), counts.active_calls ?? 0],
-    [t('JRC_CONTACT_CENTER.CARDS.OPEN_CASES'), counts.open_cases ?? 0],
-    [
-      t('JRC_CONTACT_CENTER.CARDS.PENDING_CALLBACKS'),
-      counts.pending_callbacks ?? 0,
-    ],
-  ];
+  const metrics = source.metrics.map((item, index) => {
+    const values = [
+      counts.active_calls ?? item.value,
+      counts.pending_callbacks ?? item.value,
+      item.value,
+      counts.open_cases ?? item.value,
+    ];
+    return { ...item, value: values[index] };
+  });
+  return { ...source, metrics };
 });
+
+const activeCalls = computed(() =>
+  calls.value.filter(
+    call => !['ended', 'failed', 'abandoned'].includes(call.status)
+  )
+);
+
+const refreshCallbacks = async () => {
+  const version = generation;
+  try {
+    const [response, contextResponse] = await Promise.all([
+      JrcContactCenterAPI.callbacks(accountId.value),
+      JrcContactCenterAPI.context(accountId.value),
+    ]);
+    if (version !== generation) return;
+    context.value = contextResponse.data;
+    callbacks.value = (response.data.items || []).filter(item =>
+      ['scheduled', 'in_progress', 'failed'].includes(item.state)
+    );
+  } catch {
+    if (version === generation) failed.value = true;
+  }
+};
 
 const formatDate = value =>
   value
-    ? new Intl.DateTimeFormat(undefined, {
+    ? new Intl.DateTimeFormat('pt-BR', {
         dateStyle: 'short',
         timeStyle: 'short',
       }).format(new Date(value))
     : '-';
 
-onMounted(async () => {
-  try {
-    const [contextResponse, callsResponse, callbacksResponse] =
-      await Promise.all([
-        JrcContactCenterAPI.context(accountId.value),
-        JrcContactCenterAPI.calls(accountId.value, { limit: 20 }),
-        JrcContactCenterAPI.callbacks(accountId.value),
-      ]);
-    context.value = contextResponse.data;
-    calls.value = callsResponse.data.items || [];
-    callbacks.value = (callbacksResponse.data.items || []).filter(item =>
-      ['scheduled', 'in_progress', 'failed'].includes(item.state)
-    );
-  } catch {
-    failed.value = true;
-  } finally {
-    loading.value = false;
-  }
-});
+const openCall = call => {
+  selectedCallId.value = call.id;
+  router.replace({
+    query: { ...route.query, callId: String(call.id) },
+  });
+};
+
+watch(
+  accountId,
+  async id => {
+    generation += 1;
+    const version = generation;
+    loading.value = true;
+    failed.value = false;
+    context.value = null;
+    calls.value = [];
+    callbacks.value = [];
+    selectedCallId.value = null;
+    try {
+      const [contextResponse, callsResponse, callbacksResponse] =
+        await Promise.all([
+          JrcContactCenterAPI.context(id),
+          JrcContactCenterAPI.calls(id, { limit: 20 }),
+          JrcContactCenterAPI.callbacks(id),
+        ]);
+      if (version !== generation) return;
+      context.value = contextResponse.data;
+      calls.value = callsResponse.data.items || [];
+      callbacks.value = (callbacksResponse.data.items || []).filter(item =>
+        ['scheduled', 'in_progress', 'failed'].includes(item.state)
+      );
+      const queryCallId = Number(route.query.callId);
+      if (Number.isInteger(queryCallId) && queryCallId > 0) {
+        selectedCallId.value = queryCallId;
+      }
+    } catch {
+      if (version === generation) failed.value = true;
+    } finally {
+      if (version === generation) loading.value = false;
+    }
+  },
+  { immediate: true }
+);
 </script>
 
 <template>
-  <section class="space-y-5 p-6">
-    <div>
-      <h2 class="text-lg font-semibold text-n-slate-12">
-        {{ t('JRC_CONTACT_CENTER.COCKPIT.TITLE') }}
-      </h2>
-      <p class="mt-1 text-sm text-n-slate-11">
-        {{ t('JRC_CONTACT_CENTER.COCKPIT.DESCRIPTION') }}
-      </p>
-    </div>
+  <div>
+    <VisualShowcasePage :screen="cockpitScreen" />
 
-    <div v-if="loading" class="text-sm text-n-slate-11">
-      {{ t('JRC_CONTACT_CENTER.COMMON.LOADING') }}
-    </div>
-    <div
-      v-else-if="failed"
-      class="rounded-xl border border-n-ruby-6 bg-n-ruby-3 p-4 text-sm text-n-ruby-11"
-    >
-      {{ t('JRC_CONTACT_CENTER.COMMON.ERROR') }}
-    </div>
-    <template v-else>
-      <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <div
-          v-for="[key, value] in cards"
-          :key="key"
-          class="rounded-xl border border-n-weak bg-n-solid-1 p-4"
+    <section class="space-y-5 px-4 pb-6 sm:px-6">
+      <AgentStatePanel
+        :account-id="accountId"
+        :can-operate="context?.capabilities?.operate === true"
+      />
+
+      <div
+        v-if="failed"
+        class="rounded-2xl border border-n-amber-6 bg-n-amber-2 p-4 text-sm text-n-amber-11"
+      >
+        {{ t('JRC_CONTACT_CENTER.COMMON.ERROR') }}
+      </div>
+
+      <CallWorkspace
+        v-if="selectedCallId"
+        :key="`${accountId}-${selectedCallId}`"
+        :account-id="accountId"
+        :call-id="selectedCallId"
+        :context="context"
+        @created="refreshCallbacks"
+      />
+
+      <div
+        class="grid gap-5 2xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,.7fr)]"
+      >
+        <VisualSectionCard
+          :title="t('JRC_CONTACT_CENTER.COCKPIT.RECENT_CALLS')"
+          :subtitle="loading ? t('JRC_CONTACT_CENTER.COMMON.LOADING') : ''"
+          icon="i-lucide-phone-call"
+          flush
         >
-          <p
-            class="text-xs font-medium uppercase tracking-wide text-n-slate-10"
-          >
-            {{ key }}
-          </p>
-          <p class="mt-2 text-2xl font-semibold text-n-slate-12">{{ value }}</p>
-        </div>
-      </div>
-
-      <div class="rounded-xl border border-n-weak bg-n-solid-1 p-4">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <p class="text-sm font-medium text-n-slate-12">
-              {{
-                t('JRC_CONTACT_CENTER.COMMON.PROVIDER_VALUE', {
-                  value: context?.provider?.key,
-                })
-              }}
-            </p>
-            <p class="mt-1 text-xs text-n-slate-10">
-              {{ t('JRC_CONTACT_CENTER.COCKPIT.NO_LIVE_PROVIDER') }}
-            </p>
+          <div v-if="calls.length === 0" class="p-5 text-sm text-n-slate-10">
+            {{ t('JRC_CONTACT_CENTER.COMMON.EMPTY') }}
           </div>
-          <span
-            class="rounded-full bg-n-amber-3 px-3 py-1 text-xs font-medium text-n-amber-11"
-          >
-            {{ t('JRC_CONTACT_CENTER.STATUS.PENDING_CONTRACT') }}
-          </span>
-        </div>
-      </div>
-
-      <div class="overflow-hidden rounded-xl border border-n-weak bg-n-solid-1">
-        <div class="border-b border-n-weak px-4 py-3">
-          <h3 class="text-sm font-semibold text-n-slate-12">
-            {{ t('JRC_CONTACT_CENTER.COCKPIT.CALLBACKS') }}
-          </h3>
-        </div>
-        <div v-if="callbacks.length === 0" class="p-5 text-sm text-n-slate-10">
-          {{ t('JRC_CONTACT_CENTER.COMMON.EMPTY') }}
-        </div>
-        <div v-else class="overflow-x-auto">
-          <table class="w-full text-left text-sm">
-            <thead class="bg-n-alpha-1 text-xs uppercase text-n-slate-10">
-              <tr>
-                <th class="px-4 py-3">
-                  {{ t('JRC_CONTACT_CENTER.COMMON.SCHEDULED_AT') }}
-                </th>
-                <th class="px-4 py-3">
-                  {{ t('JRC_CONTACT_CENTER.COMMON.TARGET') }}
-                </th>
-                <th class="px-4 py-3">
-                  {{ t('JRC_CONTACT_CENTER.COMMON.STATUS') }}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="callback in callbacks"
-                :key="callback.id"
-                class="border-t border-n-weak text-n-slate-11"
-                :class="
-                  String(callback.id) === selectedCallbackId
-                    ? 'bg-n-amber-2'
-                    : ''
+          <div v-else class="divide-y divide-n-weak">
+            <button
+              v-for="call in calls"
+              :key="call.id"
+              type="button"
+              class="flex w-full items-center gap-3 px-4 py-4 text-left transition hover:bg-n-alpha-1 sm:px-5"
+              @click="openCall(call)"
+            >
+              <span
+                class="grid size-11 shrink-0 place-content-center rounded-2xl bg-n-blue-2 text-n-blue-11"
+              >
+                <Icon
+                  :icon="
+                    call.direction === 'outbound'
+                      ? 'i-lucide-phone-outgoing'
+                      : 'i-lucide-phone-incoming'
+                  "
+                  class="size-5"
+                />
+              </span>
+              <span class="min-w-0 flex-1">
+                <span
+                  class="block break-words text-sm font-semibold text-n-slate-12"
+                >
+                  {{ call.ani || call.dnis || `#${call.id}` }}
+                </span>
+                <span class="mt-1 block break-words text-xs text-n-slate-10">
+                  {{ call.direction
+                  }}{{ $t('JRC_CONTACT_CENTER.VISUAL.TEXT_1145')
+                  }}{{ formatDate(call.started_at) }}
+                </span>
+              </span>
+              <VisualStatusBadge
+                :label="call.status"
+                :tone="
+                  activeCalls.some(item => item.id === call.id)
+                    ? 'emerald'
+                    : 'slate'
                 "
-              >
-                <td class="px-4 py-3">
-                  {{ formatDate(callback.scheduled_at) }}
-                </td>
-                <td class="px-4 py-3">
-                  {{ callback.target_phone || `#${callback.contact_id}` }}
-                </td>
-                <td class="px-4 py-3">{{ callback.state }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+              />
+            </button>
+          </div>
+        </VisualSectionCard>
 
-      <div class="overflow-hidden rounded-xl border border-n-weak bg-n-solid-1">
-        <div class="border-b border-n-weak px-4 py-3">
-          <h3 class="text-sm font-semibold text-n-slate-12">
-            {{ t('JRC_CONTACT_CENTER.COCKPIT.RECENT_CALLS') }}
-          </h3>
-        </div>
-        <div v-if="calls.length === 0" class="p-5 text-sm text-n-slate-10">
-          {{ t('JRC_CONTACT_CENTER.COMMON.EMPTY') }}
-        </div>
-        <div v-else class="overflow-x-auto">
-          <table class="w-full text-left text-sm">
-            <thead class="bg-n-alpha-1 text-xs uppercase text-n-slate-10">
-              <tr>
-                <th class="px-4 py-3">
-                  {{ t('JRC_CONTACT_CENTER.COMMON.STARTED_AT') }}
-                </th>
-                <th class="px-4 py-3">
-                  {{ t('JRC_CONTACT_CENTER.COMMON.DIRECTION') }}
-                </th>
-                <th class="px-4 py-3">
-                  {{ t('JRC_CONTACT_CENTER.COMMON.ANI') }}
-                </th>
-                <th class="px-4 py-3">
-                  {{ t('JRC_CONTACT_CENTER.COMMON.DNIS') }}
-                </th>
-                <th class="px-4 py-3">
-                  {{ t('JRC_CONTACT_CENTER.COMMON.STATUS') }}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="call in calls"
-                :key="call.id"
-                class="border-t border-n-weak text-n-slate-11"
+        <VisualSectionCard
+          :title="t('JRC_CONTACT_CENTER.COCKPIT.CALLBACKS')"
+          icon="i-lucide-calendar-clock"
+          flush
+        >
+          <div
+            v-if="callbacks.length === 0"
+            class="p-5 text-sm text-n-slate-10"
+          >
+            {{ t('JRC_CONTACT_CENTER.COMMON.EMPTY') }}
+          </div>
+          <div v-else class="divide-y divide-n-weak">
+            <div
+              v-for="callback in callbacks"
+              :key="callback.id"
+              class="flex items-center gap-3 px-4 py-4"
+              :class="
+                String(callback.id) === selectedCallbackId ? 'bg-n-amber-2' : ''
+              "
+            >
+              <span
+                class="grid size-10 shrink-0 place-content-center rounded-xl bg-n-iris-2 text-n-iris-11"
               >
-                <td class="px-4 py-3">{{ formatDate(call.started_at) }}</td>
-                <td class="px-4 py-3">{{ call.direction }}</td>
-                <td class="px-4 py-3">{{ call.ani || '-' }}</td>
-                <td class="px-4 py-3">{{ call.dnis || '-' }}</td>
-                <td class="px-4 py-3">{{ call.status }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+                <Icon icon="i-lucide-calendar-clock" class="size-4" />
+              </span>
+              <div class="min-w-0 flex-1">
+                <p class="break-words text-sm font-semibold text-n-slate-12">
+                  {{ callback.target_phone || `#${callback.contact_id}` }}
+                </p>
+                <p class="mt-1 text-xs text-n-slate-10">
+                  {{ formatDate(callback.scheduled_at) }}
+                </p>
+              </div>
+              <VisualStatusBadge :label="callback.state" tone="violet" />
+            </div>
+          </div>
+        </VisualSectionCard>
       </div>
-    </template>
-  </section>
+    </section>
+  </div>
 </template>

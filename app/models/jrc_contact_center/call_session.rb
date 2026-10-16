@@ -18,8 +18,37 @@ class JrcContactCenter::CallSession < JrcContactCenter::ApplicationRecord
   validates :direction, inclusion: { in: DIRECTIONS }
   validates :status, inclusion: { in: STATUSES }
   validate :timestamps_are_monotonic
+  after_update :track_closure_survey
+  after_update_commit :enqueue_closure_survey
+
+  def f1_data
+    metadata.fetch('jrc_f1', {})
+  end
+
+  def update_f1_data(attributes)
+    update!(metadata: metadata.merge('jrc_f1' => f1_data.merge(attributes)))
+  end
 
   private
+
+  def track_closure_survey
+    @closure_survey_pending = true if saved_change_to_status? || saved_change_to_answered_at? || saved_change_to_ended_at?
+  end
+
+  def enqueue_closure_survey
+    return unless @closure_survey_pending
+
+    @closure_survey_pending = false
+    return unless eligible_for_closure_survey?
+    return unless JrcRelationship::SurveyRule.where(account: account, active: true).exists?(["matchers ->> 'source_type' = ?", self.class.name])
+
+    JrcRelationship::SurveyClosureJob.perform_later(self.class.name, id, "contact-center:#{id}")
+  end
+
+  def eligible_for_closure_survey?
+    status == 'ended' && answered_at && ended_at && account.feature_enabled?('jrc_contact_center') &&
+      JrcRelationship::SurveyEngine.enabled?(account)
+  end
 
   def timestamps_are_monotonic
     errors.add(:answered_at, 'must not be before started_at') if precedes?(answered_at, started_at)

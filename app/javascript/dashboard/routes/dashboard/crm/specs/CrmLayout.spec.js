@@ -68,6 +68,14 @@ describe('CRM module navigation', () => {
     );
   });
 
+  it('keeps the CRM Field tab active across its nested screens', async () => {
+    mocks.route.name = 'crm_field_reports';
+    await flushPromises();
+    expect(wrapper.get('[aria-current="page"]').attributes('href')).toBe(
+      'crm_field_my_day'
+    );
+  });
+
   it('provides overflow controls and updates them after horizontal scrolling', async () => {
     const list = wrapper.get('nav > div').element;
     Object.defineProperties(list, {

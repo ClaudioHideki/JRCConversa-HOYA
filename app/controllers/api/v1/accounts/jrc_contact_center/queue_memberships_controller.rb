@@ -5,7 +5,7 @@ class Api::V1::Accounts::JrcContactCenter::QueueMembershipsController < Api::V1:
     authorize_contact_center!(:configure?)
     memberships = scoped_memberships.includes(:queue, account_user: :user).order(:queue_id, :priority, :id)
     memberships = memberships.where(queue_id: params[:queue_id]) if params[:queue_id].present?
-    render json: base_payload.merge(items: memberships.map { |membership| serialize(membership) })
+    render json: base_payload.merge(items: memberships.map { |membership| serialize(membership) }, agents: agent_options)
   end
 
   def create
@@ -22,6 +22,12 @@ class Api::V1::Accounts::JrcContactCenter::QueueMembershipsController < Api::V1:
   end
 
   private
+
+  def agent_options
+    Current.account.account_users.includes(:user).order(:id).map do |member|
+      { account_user_id: member.id.to_s, name: member.user.available_name }
+    end
+  end
 
   def scoped_memberships
     JrcContactCenter::QueueMembership.where(account: Current.account)

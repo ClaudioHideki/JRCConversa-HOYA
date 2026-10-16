@@ -1,68 +1,194 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
-import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
+import { computed, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import JrcContactCenterAPI from 'dashboard/api/jrcContactCenter';
+import VisualShowcasePage from '../components/visual/VisualShowcasePage.vue';
+import VisualSectionCard from '../components/visual/VisualSectionCard.vue';
+import VisualStatusBadge from '../components/visual/VisualStatusBadge.vue';
+import { contactCenterScreen } from '../demo/contactCenterVisualCatalog';
+
+const { t } = useI18n();
 
 const route = useRoute();
-const { t } = useI18n();
 const loading = ref(true);
 const failed = ref(false);
 const metrics = ref({});
 const accountId = computed(() => route.params.accountId);
-const cards = computed(() => [
-  [t('JRC_CONTACT_CENTER.REPORTS.OFFERED'), metrics.value.offered_count || 0],
-  [t('JRC_CONTACT_CENTER.REPORTS.ANSWERED'), metrics.value.answered_count || 0],
+
+const reportScreen = computed(() => {
+  const source = contactCenterScreen('reports', t);
+  const values = [
+    metrics.value.offered_count,
+    metrics.value.abandoned_count,
+    metrics.value.tma_seconds
+      ? `${Math.floor(metrics.value.tma_seconds / 60)
+          .toString()
+          .padStart(2, '0')}:${(metrics.value.tma_seconds % 60)
+          .toString()
+          .padStart(2, '0')}`
+      : null,
+    metrics.value.nps_score,
+  ];
+  return {
+    ...source,
+    metrics: source.metrics.map((item, index) => ({
+      ...item,
+      value: values[index] ?? item.value,
+    })),
+  };
+});
+
+const operationalRows = computed(() => [
   [
-    t('JRC_CONTACT_CENTER.REPORTS.ABANDONED'),
+    t('JRC_CONTACT_CENTER.VISUAL.OFERECIDAS'),
+    metrics.value.offered_count || 0,
+    'blue',
+  ],
+  [
+    t('JRC_CONTACT_CENTER.VISUAL.ATENDIDAS'),
+    metrics.value.answered_count || 0,
+    'emerald',
+  ],
+  [
+    t('JRC_CONTACT_CENTER.VISUAL.ABANDONADAS'),
     metrics.value.abandoned_count || 0,
+    'ruby',
   ],
   [
-    t('JRC_CONTACT_CENTER.REPORTS.TRANSFERRED'),
+    t('JRC_CONTACT_CENTER.VISUAL.TRANSFERIDAS'),
     metrics.value.transferred_count || 0,
+    'violet',
   ],
-  [t('JRC_CONTACT_CENTER.REPORTS.FALLBACK'), metrics.value.fallback_count || 0],
+  [
+    t('JRC_CONTACT_CENTER.VISUAL.FALLBACK_COE_SAC'),
+    metrics.value.fallback_count || 0,
+    'amber',
+  ],
 ]);
 
-onMounted(async () => {
+let generation = 0;
+const load = async () => {
+  generation += 1;
+  const version = generation;
+  loading.value = true;
+  failed.value = false;
   try {
     const { data } = await JrcContactCenterAPI.reportSummary(accountId.value);
-    metrics.value = data.metrics || {};
+    if (version === generation) metrics.value = data.metrics || {};
   } catch {
-    failed.value = true;
+    if (version === generation) failed.value = true;
   } finally {
-    loading.value = false;
+    if (version === generation) loading.value = false;
   }
-});
+};
+watch(accountId, load, { immediate: true });
 </script>
 
 <template>
-  <section class="space-y-5 p-6">
-    <div>
-      <h2 class="text-lg font-semibold text-n-slate-12">
-        {{ t('JRC_CONTACT_CENTER.REPORTS.TITLE') }}
-      </h2>
-      <p class="mt-1 text-sm text-n-slate-11">
-        {{ t('JRC_CONTACT_CENTER.REPORTS.DESCRIPTION') }}
-      </p>
-    </div>
-    <div v-if="loading" class="text-sm text-n-slate-11">
-      {{ t('JRC_CONTACT_CENTER.COMMON.LOADING') }}
-    </div>
-    <div v-else-if="failed" class="text-sm text-n-ruby-11">
-      {{ t('JRC_CONTACT_CENTER.COMMON.ERROR') }}
-    </div>
-    <div v-else class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+  <div>
+    <VisualShowcasePage :screen="reportScreen" />
+
+    <section class="space-y-5 px-4 pb-6 sm:px-6">
       <div
-        v-for="[key, value] in cards"
-        :key="key"
-        class="rounded-xl border border-n-weak bg-n-solid-1 p-4"
+        v-if="failed"
+        class="rounded-2xl border border-n-amber-6 bg-n-amber-2 p-4 text-sm text-n-amber-11"
       >
-        <p class="text-xs font-medium uppercase tracking-wide text-n-slate-10">
-          {{ key }}
-        </p>
-        <p class="mt-2 text-2xl font-semibold text-n-slate-12">{{ value }}</p>
+        {{
+          $t(
+            'JRC_CONTACT_CENTER.VISUAL.A_PROJECAO_VISUAL_PERMANECE_DISPONIVEL_OS_DADOS_NATIVOS'
+          )
+        }}
       </div>
-    </div>
-  </section>
+
+      <div class="grid gap-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,.7fr)]">
+        <VisualSectionCard
+          :title="$t('JRC_CONTACT_CENTER.VISUAL.RESUMO_OPERACIONAL_NATIVO')"
+          :subtitle="
+            loading
+              ? $t('JRC_CONTACT_CENTER.VISUAL.TEXT_1146')
+              : $t('JRC_CONTACT_CENTER.VISUAL.TEXT_1147')
+          "
+          icon="i-lucide-chart-column"
+          flush
+        >
+          <div class="divide-y divide-n-weak">
+            <div
+              v-for="[label, value, tone] in operationalRows"
+              :key="label"
+              class="flex items-center justify-between gap-3 px-4 py-4 sm:px-5"
+            >
+              <span class="text-sm font-medium text-n-slate-11">{{
+                label
+              }}</span>
+              <VisualStatusBadge :label="String(value)" :tone="tone" />
+            </div>
+          </div>
+        </VisualSectionCard>
+
+        <VisualSectionCard
+          :title="$t('JRC_CONTACT_CENTER.VISUAL.FILTROS_E_EXPORTACAO')"
+          :subtitle="
+            $t(
+              'JRC_CONTACT_CENTER.VISUAL.ESTRUTURA_VISUAL_PREPARADA_PARA_A_CAMADA_DE_BI'
+            )
+          "
+          icon="i-lucide-filter"
+        >
+          <div class="space-y-3">
+            <label class="block">
+              <span class="text-xs font-semibold text-n-slate-10">{{
+                $t('JRC_CONTACT_CENTER.VISUAL.PERIODO')
+              }}</span>
+              <select
+                class="mt-1.5 w-full rounded-xl border border-n-weak bg-n-solid-1 px-3 py-2.5 text-sm text-n-slate-12"
+              >
+                <option>
+                  {{ $t('JRC_CONTACT_CENTER.VISUAL.ULTIMOS_30_DIAS') }}
+                </option>
+                <option>{{ $t('JRC_CONTACT_CENTER.VISUAL.HOJE') }}</option>
+                <option>
+                  {{ $t('JRC_CONTACT_CENTER.VISUAL.ESTA_SEMANA') }}
+                </option>
+              </select>
+            </label>
+            <label class="block">
+              <span class="text-xs font-semibold text-n-slate-10">{{
+                $t('JRC_CONTACT_CENTER.VISUAL.UNIDADE_FILA')
+              }}</span>
+              <select
+                class="mt-1.5 w-full rounded-xl border border-n-weak bg-n-solid-1 px-3 py-2.5 text-sm text-n-slate-12"
+              >
+                <option>
+                  {{
+                    $t(
+                      'JRC_CONTACT_CENTER.VISUAL.TODAS_AS_UNIDADES_AUTORIZADAS'
+                    )
+                  }}
+                </option>
+                <option>
+                  {{ $t('JRC_CONTACT_CENTER.VISUAL.SAC_NACIONAL') }}
+                </option>
+                <option>
+                  {{ $t('JRC_CONTACT_CENTER.VISUAL.FINANCEIRO') }}
+                </option>
+              </select>
+            </label>
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <button
+                class="rounded-xl bg-n-brand px-3 py-2.5 text-sm font-semibold text-white"
+              >
+                {{ $t('JRC_CONTACT_CENTER.VISUAL.APLICAR') }}
+              </button>
+              <button
+                class="rounded-xl border border-n-weak bg-n-solid-1 px-3 py-2.5 text-sm font-semibold text-n-slate-11"
+              >
+                {{ $t('JRC_CONTACT_CENTER.VISUAL.EXPORTAR') }}
+              </button>
+            </div>
+          </div>
+        </VisualSectionCard>
+      </div>
+    </section>
+  </div>
 </template>

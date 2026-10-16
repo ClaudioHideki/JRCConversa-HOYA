@@ -18,98 +18,110 @@ const canScrollForward = ref(false);
 const navigation = [
   {
     name: 'crm_dashboard',
-    label: 'Visão Geral',
+    label: t('JRC_CONTACT_CENTER.VISUAL.VISAO_GERAL'),
     icon: 'i-lucide-layout-dashboard',
     tone: 'blue',
   },
   {
     name: 'crm_indicators',
-    label: 'Indicadores',
+    label: t('JRC_CONTACT_CENTER.VISUAL.INDICADORES'),
     icon: 'i-lucide-chart-no-axes-combined',
     tone: 'cyan',
   },
   {
     name: 'crm_leads',
-    label: 'Leads',
+    label: t('JRC_CONTACT_CENTER.VISUAL.LEADS'),
     icon: 'i-lucide-user-round-plus',
     tone: 'violet',
   },
   {
     name: 'crm_deals',
-    label: 'Negócios',
+    label: t('JRC_CONTACT_CENTER.VISUAL.NEGOCIOS'),
     icon: 'i-lucide-handshake',
     tone: 'orange',
   },
   {
     name: 'crm_funnel',
-    label: 'Funil',
+    label: t('JRC_CONTACT_CENTER.VISUAL.FUNIL'),
     icon: 'i-lucide-filter',
     tone: 'violet',
   },
   {
     name: 'crm_wallet',
-    label: 'Minha Carteira',
+    label: t('JRC_CONTACT_CENTER.VISUAL.MINHA_CARTEIRA'),
     icon: 'i-lucide-briefcase-business',
     tone: 'blue',
   },
   {
+    name: 'crm_field_my_day',
+    label: t('JRC_CONTACT_CENTER.VISUAL.CRM_FIELD'),
+    icon: 'i-lucide-map-pinned',
+    tone: 'green',
+    routePrefix: 'crm_field_',
+  },
+  {
     name: 'crm_activities',
-    label: 'Atividades',
+    label: t('JRC_CONTACT_CENTER.VISUAL.ATIVIDADES'),
     icon: 'i-lucide-calendar-check-2',
     tone: 'orange',
   },
   {
     name: 'crm_calendar',
-    label: 'Agenda',
+    label: t('JRC_CONTACT_CENTER.VISUAL.AGENDA'),
     icon: 'i-lucide-calendar-days',
     tone: 'violet',
   },
   {
     name: 'crm_products',
-    label: 'Produtos',
+    label: t('JRC_CONTACT_CENTER.VISUAL.PRODUTOS'),
     icon: 'i-lucide-package',
     tone: 'green',
   },
   {
     name: 'crm_proposals',
-    label: 'Propostas',
+    label: t('JRC_CONTACT_CENTER.VISUAL.PROPOSTAS'),
     icon: 'i-lucide-file-signature',
     tone: 'rose',
   },
   {
     name: 'crm_orders',
-    label: 'Pedidos',
+    label: t('JRC_CONTACT_CENTER.VISUAL.PEDIDOS'),
     icon: 'i-lucide-shopping-cart',
     tone: 'green',
   },
   {
     name: 'crm_contracts',
-    label: 'Contratos',
+    label: t('JRC_CONTACT_CENTER.VISUAL.CONTRATOS'),
     icon: 'i-lucide-file-check-2',
     tone: 'blue',
   },
-  { name: 'crm_goals', label: 'Metas', icon: 'i-lucide-target', tone: 'cyan' },
+  {
+    name: 'crm_goals',
+    label: t('JRC_CONTACT_CENTER.VISUAL.METAS'),
+    icon: 'i-lucide-target',
+    tone: 'cyan',
+  },
   {
     name: 'crm_commissions',
-    label: 'Comissões',
+    label: t('JRC_CONTACT_CENTER.VISUAL.COMISSOES'),
     icon: 'i-lucide-badge-dollar-sign',
     tone: 'orange',
   },
   {
     name: 'crm_backoffice',
-    label: 'Backoffice',
+    label: t('JRC_CONTACT_CENTER.VISUAL.BACKOFFICE'),
     icon: 'i-lucide-settings-2',
     tone: 'green',
   },
   {
     name: 'crm_management',
-    label: 'Gestão de Equipe',
+    label: t('JRC_CONTACT_CENTER.VISUAL.GESTAO_DE_EQUIPE'),
     icon: 'i-lucide-users-round',
     tone: 'violet',
   },
   {
     name: 'crm_settings',
-    label: 'Configurações',
+    label: t('JRC_CONTACT_CENTER.VISUAL.CONFIGURACOES'),
     icon: 'i-lucide-settings',
     tone: 'blue',
   },
@@ -123,8 +135,13 @@ const visibleNavigation = computed(() =>
   )
 );
 
+const isNavigationActive = item =>
+  item.routePrefix
+    ? String(route.name || '').startsWith(item.routePrefix)
+    : route.name === item.name;
+
 const activeTabClass = item => {
-  if (route.name !== item.name)
+  if (!isNavigationActive(item))
     return {
       blue: 'border-n-blue-6 bg-n-blue-2 text-n-blue-11 hover:bg-n-blue-3',
       cyan: 'border-n-teal-6 bg-n-teal-2 text-n-teal-11 hover:bg-n-teal-3',
@@ -205,10 +222,14 @@ onMounted(revealActiveTab);
             <h1
               class="truncate text-xl font-bold tracking-tight text-n-slate-12"
             >
-              CRM Comercial
+              {{ $t('JRC_CONTACT_CENTER.VISUAL.CRM_COMERCIAL') }}
             </h1>
             <p class="truncate text-xs text-n-slate-11">
-              Conversas, oportunidades e relacionamento em um só lugar
+              {{
+                $t(
+                  'JRC_CONTACT_CENTER.VISUAL.CONVERSAS_OPORTUNIDADES_E_RELACIONAMENTO_EM_UM_SO_LUGAR'
+                )
+              }}
             </p>
           </div>
         </div>
@@ -216,7 +237,9 @@ onMounted(revealActiveTab);
           :to="{ name: 'crm_leads', query: { new: '1' } }"
           class="inline-flex shrink-0 items-center gap-2 rounded-xl bg-n-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-110 focus-visible:ring-2 focus-visible:ring-n-blue-8"
         >
-          <i class="i-lucide-plus size-4" /> Novo lead
+          <i class="i-lucide-plus size-4" />{{
+            $t('JRC_CONTACT_CENTER.VISUAL.NOVO_LEAD')
+          }}
         </RouterLink>
       </div>
       <nav
@@ -242,7 +265,7 @@ onMounted(revealActiveTab);
             v-for="item in visibleNavigation"
             :key="item.name"
             :to="{ name: item.name }"
-            :aria-current="route.name === item.name ? 'page' : undefined"
+            :aria-current="isNavigationActive(item) ? 'page' : undefined"
             class="jrc-crm-tab flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border px-3 py-2.5 text-sm font-medium transition focus-visible:ring-2 focus-visible:ring-n-blue-8"
             :class="
               activeTabClass(item) ||

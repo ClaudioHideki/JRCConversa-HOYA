@@ -9,6 +9,18 @@ const base = accountId => {
 };
 
 export default {
+  agentState: accountId => axios.get(`${base(accountId)}/agent_state`),
+  updateAgentState: (accountId, agentState) =>
+    axios.patch(`${base(accountId)}/agent_state`, { agent_state: agentState }),
+  supervisor: accountId => axios.get(`${base(accountId)}/supervisor`),
+  operationalHealth: accountId =>
+    axios.get(`${base(accountId)}/integrations/health`),
+  commands: accountId => axios.get(`${base(accountId)}/commands`),
+  createCommand: (accountId, command) =>
+    axios.post(`${base(accountId)}/commands`, { command }),
+  events: accountId => axios.get(`${base(accountId)}/events`),
+  reprocessEvent: (accountId, id) =>
+    axios.post(`${base(accountId)}/events/${Number(id)}/reprocess`),
   context: accountId => axios.get(`${base(accountId)}/context`),
   customerContext: (accountId, phone) =>
     axios.get(`${base(accountId)}/customer_context`, { params: { phone } }),

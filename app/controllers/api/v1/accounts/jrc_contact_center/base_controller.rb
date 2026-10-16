@@ -5,11 +5,14 @@ class Api::V1::Accounts::JrcContactCenter::BaseController < Api::V1::Accounts::B
   around_action :use_account_timezone
 
   rescue_from JrcContactCenter::Providers::BaseAdapter::CapabilityUnavailable, with: :render_capability_unavailable
+  rescue_from JrcContactCenter::OperationError, with: :render_operation_error
 
   private
 
   def ensure_contact_center_enabled!
     raise Pundit::NotAuthorizedError unless Current.account&.active? && Current.account.feature_enabled?('jrc_contact_center')
+
+    @contact_center_account_id = Current.account.id
   end
 
   def authorize_contact_center!(action = :access?)
@@ -22,7 +25,7 @@ class Api::V1::Accounts::JrcContactCenter::BaseController < Api::V1::Accounts::B
   end
 
   def base_payload
-    { contract_version: 1, account_id: Current.account.id.to_s }
+    { contract_version: 1, account_id: @contact_center_account_id.to_s }
   end
 
   def contact_center_access
@@ -53,5 +56,9 @@ class Api::V1::Accounts::JrcContactCenter::BaseController < Api::V1::Accounts::B
 
   def render_capability_unavailable(error)
     render json: base_payload.merge(error: 'provider_capability_unavailable', message: error.message), status: :not_implemented
+  end
+
+  def render_operation_error(error)
+    render json: base_payload.merge(error: error.code), status: error.status
   end
 end

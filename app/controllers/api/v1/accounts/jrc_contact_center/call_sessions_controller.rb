@@ -22,7 +22,7 @@ class Api::V1::Accounts::JrcContactCenter::CallSessionsController < Api::V1::Acc
 
   def serialize(call)
     call.as_json(only: %i[id provider external_session_id correlation_id direction status ani dnis contact_id company_id current_unit_id
-                          current_queue_id started_at answered_at ended_at metadata lock_version])
+                          current_queue_id started_at answered_at ended_at lock_version]).merge('metadata' => call.metadata.except('jrc_f1'))
   end
 
   def journey(call)
