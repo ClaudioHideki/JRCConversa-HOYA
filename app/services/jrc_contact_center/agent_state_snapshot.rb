@@ -39,25 +39,33 @@ class JrcContactCenter::AgentStateSnapshot
     state_payload.merge(
       eligible: reason.nil?, eligibility_reason: reason,
       eligible_queue_ids: reason.nil? ? [current.queue_id.to_s] : [],
-      queues: memberships.includes(:queue).map { |membership| { id: membership.queue_id.to_s, name: membership.queue.name } }
+      queues: memberships.includes(:queue).map { |membership| { id: membership.queue_id.to_s, name: membership.queue.name } },
+      pending_qualifications: pending_qualifications.includes(account_user: :user).map(&:operational_payload)
     )
   end
 
   private
 
+  def pending_qualifications
+    @pending_qualifications ||= JrcContactCenter::Qualification.pending.where(account: @account, account_user: @member).order(:started_at)
+  end
+
   def state_payload
     {
-      account_user_id: @member.id.to_s, state: current&.state || 'offline', state_version: version,
+      account_user_id: @member.id.to_s, state: pending_qualifications.exists? ? 'acw' : current&.state || 'offline', state_version: version,
       reason_code: current&.reason_code, started_at: current&.started_at, source: current&.source,
       provider_confirmed: provider_confirmed?, logged_in: current.present? && %w[offline unavailable].exclude?(current.state)
     }
   end
 
   def provider_confirmed?
+    return false if pending_qualifications.exists?
+
     current&.source == @adapter.provider_key && current.metadata['provider_confirmed'] == true
   end
 
   def eligibility_reason
+    return 'tabulation_pending' if pending_qualifications.exists?
     return 'agent_not_available' unless current&.state == 'available'
     return 'call_active' if active_call?
     return 'queue_membership_missing' unless memberships.exists?

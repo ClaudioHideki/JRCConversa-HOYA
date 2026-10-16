@@ -1159,6 +1159,21 @@ const menuItems = computed(() => {
   );
 
   return [
+    useUnifiedAttendanceNavigation.value
+      ? {
+          name: 'JRC Call Center',
+          label: t('JRC_CONTACT_CENTER.NAVIGATION.CALL_CENTER'),
+          icon: 'i-lucide-headset',
+          to: accountScopedRoute('jrc_contact_center_cockpit'),
+          activeOn: contactCenterRouteNames,
+        }
+      : null,
+    useUnifiedAttendanceNavigation.value
+      ? {
+          ...find('Inbox'),
+          label: t('JRC_CONTACT_CENTER.NAVIGATION.ATTENDANCE'),
+        }
+      : find('Inbox'),
     {
       name: 'JRC Cockpit',
       label: 'Cockpit',
@@ -1167,9 +1182,6 @@ const menuItems = computed(() => {
       activeOn: ['jrc_cockpit', 'jrc_service_center'],
       ignoreFeatureFlag: true,
     },
-    useUnifiedAttendanceNavigation.value
-      ? { ...find('Inbox'), label: t('JRC_CONTACT_CENTER.INBOX.TITLE') }
-      : find('Inbox'),
     !useUnifiedAttendanceNavigation.value && conversationModule
       ? {
           ...conversationModule,
@@ -1242,15 +1254,6 @@ const menuItems = computed(() => {
               : []),
           ],
           ignoreFeatureFlag: true,
-        }
-      : null,
-    useUnifiedAttendanceNavigation.value
-      ? {
-          name: 'JRC Call Center',
-          label: t('JRC_CONTACT_CENTER.NAVIGATION.CALL_CENTER'),
-          icon: 'i-lucide-headset',
-          to: accountScopedRoute('jrc_contact_center_cockpit'),
-          activeOn: contactCenterRouteNames,
         }
       : null,
     {
@@ -1694,88 +1697,6 @@ const menuItems = computed(() => {
                 },
               ],
             },
-            {
-              name: 'CRM Commercial Management',
-              label: t('JRC_CONTACT_CENTER.VISUAL.GESTAO_COMERCIAL'),
-              icon: 'i-lucide-briefcase-business',
-              collapsible: true,
-              children: [
-                {
-                  name: 'CRM Leads',
-                  label: t('JRC_CONTACT_CENTER.VISUAL.LEADS'),
-                  icon: 'i-lucide-user-round-plus',
-                  to: accountScopedRoute('crm_leads'),
-                  activeOn: ['crm_leads'],
-                },
-                {
-                  name: 'CRM Funnel',
-                  label: t('JRC_CONTACT_CENTER.VISUAL.FUNIL'),
-                  icon: 'i-lucide-columns-3',
-                  to: accountScopedRoute('crm_funnel'),
-                  activeOn: ['crm_funnel'],
-                },
-                {
-                  name: 'CRM Products',
-                  label: t('JRC_CONTACT_CENTER.VISUAL.PRODUTOS'),
-                  icon: 'i-lucide-package',
-                  to: accountScopedRoute('crm_products'),
-                  activeOn: ['crm_products'],
-                },
-                {
-                  name: 'CRM Proposals',
-                  label: t('JRC_CONTACT_CENTER.VISUAL.PROPOSTAS'),
-                  icon: 'i-lucide-file-signature',
-                  to: accountScopedRoute('crm_proposals'),
-                  activeOn: ['crm_proposals'],
-                },
-                {
-                  name: 'CRM Contracts',
-                  label: t('JRC_CONTACT_CENTER.VISUAL.CONTRATOS'),
-                  icon: 'i-lucide-file-check-2',
-                  to: accountScopedRoute('crm_contracts'),
-                  activeOn: ['crm_contracts'],
-                },
-                {
-                  name: 'CRM Goals',
-                  label: t('JRC_CONTACT_CENTER.VISUAL.METAS'),
-                  icon: 'i-lucide-target',
-                  to: accountScopedRoute('crm_goals'),
-                  activeOn: ['crm_goals'],
-                },
-                {
-                  name: 'CRM Commissions',
-                  label: t('JRC_CONTACT_CENTER.VISUAL.COMISSOES'),
-                  icon: 'i-lucide-badge-dollar-sign',
-                  to: accountScopedRoute('crm_commissions'),
-                  activeOn: ['crm_commissions'],
-                },
-                {
-                  name: 'CRM Backoffice',
-                  label: t('JRC_CONTACT_CENTER.AGENT.PAUSE_REASONS.backoffice'),
-                  icon: 'i-lucide-settings-2',
-                  to: accountScopedRoute('crm_backoffice'),
-                  activeOn: ['crm_backoffice'],
-                },
-                ...(store.getters.getCurrentRole === 'administrator'
-                  ? [
-                      {
-                        name: 'CRM Management',
-                        label: t('JRC_CONTACT_CENTER.VISUAL.GESTAO_DE_EQUIPE'),
-                        icon: 'i-lucide-users-round',
-                        to: accountScopedRoute('crm_management'),
-                        activeOn: ['crm_management'],
-                      },
-                      {
-                        name: 'CRM Settings',
-                        label: t('JRC_CONTACT_CENTER.NAV_GROUPS.SETTINGS'),
-                        icon: 'i-lucide-settings',
-                        to: accountScopedRoute('crm_settings'),
-                        activeOn: ['crm_settings'],
-                      },
-                    ]
-                  : []),
-              ],
-            },
           ]
         : [
             {
@@ -2053,7 +1974,7 @@ const menuSections = computed(() => {
       {
         name: 'attendance',
         label: t('JRC_CONTACT_CENTER.NAV_GROUPS.ATTENDANCE'),
-        items: take(['JRC Cockpit', 'Inbox', 'JRC Call Center']),
+        items: take(['JRC Call Center', 'Inbox', 'JRC Cockpit']),
       },
       {
         name: 'crm',

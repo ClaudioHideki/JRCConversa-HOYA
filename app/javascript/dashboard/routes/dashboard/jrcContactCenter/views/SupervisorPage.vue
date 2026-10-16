@@ -1,10 +1,11 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import JrcContactCenterAPI from 'dashboard/api/jrcContactCenter';
 import { agentStateLabels } from '../agentStateLabels';
+import { acwLabels } from '../../inbox/acwLabels';
 import VisualShowcasePage from '../components/visual/VisualShowcasePage.vue';
 import VisualSectionCard from '../components/visual/VisualSectionCard.vue';
 import VisualStatusBadge from '../components/visual/VisualStatusBadge.vue';
@@ -13,6 +14,7 @@ import { contactCenterScreen } from '../demo/contactCenterVisualCatalog';
 const route = useRoute();
 const { t } = useI18n();
 const labels = computed(() => agentStateLabels(t));
+const closingLabels = computed(() => acwLabels(t));
 const loading = ref(true);
 const failed = ref(false);
 const units = ref([]);
@@ -82,6 +84,20 @@ const load = async () => {
   }
 };
 watch(accountId, load, { immediate: true });
+const acwPoll = setInterval(async () => {
+  if (loading.value) return;
+  const version = generation;
+  try {
+    const response = await JrcContactCenterAPI.supervisor(accountId.value);
+    if (version === generation) snapshot.value = response.data;
+  } catch {
+    if (version === generation) failed.value = true;
+  }
+}, 5000);
+onBeforeUnmount(() => {
+  generation += 1;
+  clearInterval(acwPoll);
+});
 </script>
 
 <template>
@@ -202,6 +218,33 @@ watch(accountId, load, { immediate: true });
                 :tone="agentTone(agent.state)"
                 dot
               />
+              <div
+                v-for="record in agent.pending_qualifications || []"
+                :key="record.id"
+                class="w-full rounded-lg p-3 text-sm"
+                :class="
+                  record.overdue
+                    ? 'bg-n-ruby-2 text-n-ruby-11'
+                    : 'bg-n-blue-2 text-n-blue-11'
+                "
+              >
+                {{
+                  t('JRC_CONTACT_CENTER.ACW_OPERATION.SUPERVISOR_DETAIL', {
+                    channel: closingLabels.channels[record.channel],
+                    id:
+                      record.call_session_id || record.conversation_display_id,
+                    elapsed: record.elapsed_seconds,
+                    limit: record.acw_limit_seconds,
+                  })
+                }}
+                <p class="mt-1 font-semibold">
+                  {{
+                    record.overdue
+                      ? t('JRC_CONTACT_CENTER.ACW_OPERATION.OVERDUE')
+                      : t('JRC_CONTACT_CENTER.INBOX_360.ACW')
+                  }}
+                </p>
+              </div>
             </div>
           </div>
         </VisualSectionCard>

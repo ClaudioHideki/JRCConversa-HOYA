@@ -410,9 +410,36 @@ const turnOffExtension = async () => {
 
 const call = () => {
   callEvents.value = [];
-  return run(() => client.call(normalizeSipDialNumber(destination.value)));
+  return run(async () => {
+    const account = activeAccountId.value;
+    const version = initializationVersion;
+    if (credential.value?.contact_center_enabled) {
+      const { data } = await SipCredentialsAPI.getMine();
+      if (
+        version !== initializationVersion ||
+        account !== activeAccountId.value ||
+        data.contact_center_acw_pending
+      )
+        return false;
+    }
+    return client.call(normalizeSipDialNumber(destination.value));
+  });
 };
-const answer = () => run(() => client.answer());
+const answer = () =>
+  run(async () => {
+    const account = activeAccountId.value;
+    const version = initializationVersion;
+    if (credential.value?.contact_center_enabled) {
+      const { data } = await SipCredentialsAPI.getMine();
+      if (
+        version !== initializationVersion ||
+        account !== activeAccountId.value ||
+        data.contact_center_acw_pending
+      )
+        return false;
+    }
+    return client.answer();
+  });
 const reject = () => run(() => client.reject());
 const hangup = () => run(() => client.hangup());
 const setMuted = value => run(() => client.setMuted(value));

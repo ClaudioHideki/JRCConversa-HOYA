@@ -12,7 +12,11 @@ class JrcContactCenter::CommandDispatcher
     command = nil
     replayed = false
     attributes = command_attributes(action, parameters, options)
-    @actor_account_user.with_lock do
+    @account.with_lock do
+      @actor_account_user.lock!
+      if %w[originate answer accept].include?(action) && JrcContactCenter::Qualification.pending.exists?(account: @account, account_user: @actor_account_user)
+        raise JrcContactCenter::OperationError.new('tabulation_pending', status: :conflict)
+      end
       existing = JrcContactCenter::Command.find_by(account: @account, command_id: attributes.fetch(:command_id))
       if existing
         command = replay(existing, attributes)

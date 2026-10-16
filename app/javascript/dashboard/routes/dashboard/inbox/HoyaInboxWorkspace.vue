@@ -31,6 +31,8 @@ import {
   pauseReasonLabels,
 } from 'dashboard/routes/dashboard/jrcContactCenter/agentStateLabels';
 import { useInboxCustomer360 } from './useInboxCustomer360';
+import { useAttendanceClosing } from './useAttendanceClosing';
+import QualificationHistory from './QualificationHistory.vue';
 
 const props = defineProps({
   accountId: { type: Number, required: true },
@@ -83,23 +85,7 @@ const clock = setInterval(() => {
   now.value = Date.now();
 }, 1000);
 let agentGeneration = 0;
-const pausedElapsed = computed(() => {
-  const seconds =
-    Math.max(
-      0,
-      Math.floor(
-        (now.value - new Date(agent.value?.started_at).getTime()) / 1000
-      )
-    ) || 0;
-  return [
-    Math.floor(seconds / 3600),
-    Math.floor(seconds / 60) % 60,
-    seconds % 60,
-  ]
-    .map(value => String(value).padStart(2, '0'))
-    .join(':');
-});
-
+let actionGeneration = 0;
 const canOperate = computed(
   () => props.context?.capabilities?.operate === true
 );
@@ -186,12 +172,37 @@ const customerProps = computed(() => ({
 const categories = computed(() => [
   ...new Set(cases.value.map(item => item.category).filter(Boolean)),
 ]);
+const channelKey = computed(() =>
+  isVoice.value
+    ? 'voice'
+    : getInboxChannelKey(props.inboxFor(conversation.value || {}))
+);
+const isWhatsApp = computed(() => channelKey.value === 'whatsapp');
+const requiresWhatsAppClosing = computed(() => {
+  const inbox = props.inboxFor(conversation.value || {});
+  const type = inbox.channel_type || inbox.channelType;
+  return (
+    type === 'Channel::Whatsapp' ||
+    (type === 'Channel::TwilioSms' && inbox.medium === 'whatsapp')
+  );
+});
+const supportsClosing = computed(
+  () => isVoice.value || requiresWhatsAppClosing.value
+);
+const workspaceTabs = computed(() => [
+  'CONVERSATION',
+  'SCRIPT',
+  'CUSTOMER_DATA',
+  'ORDERS',
+  'CASES',
+  'HISTORY',
+  'TASKS',
+  ...(supportsClosing.value ? ['CLOSING'] : []),
+]);
 const channel = computed(() =>
   isVoice.value
     ? props.channels.find(item => item.key === 'voice')
-    : INBOX_CHANNEL_PRESENTATION[
-        getInboxChannelKey(props.inboxFor(conversation.value || {}))
-      ]
+    : INBOX_CHANNEL_PRESENTATION[channelKey.value]
 );
 const customerName = computed(
   () =>
@@ -295,13 +306,150 @@ const voiceActions = computed(() => [
 ]);
 const runAction = async action => {
   if (!action.enabled) return;
+  const version = actionGeneration;
+  const key = [
+    props.accountId,
+    props.currentCallId,
+    props.currentConversationId,
+  ].join(':');
   actionError.value = false;
   try {
     await action.action();
   } catch {
-    actionError.value = true;
+    if (
+      version === actionGeneration &&
+      key ===
+        [
+          props.accountId,
+          props.currentCallId,
+          props.currentConversationId,
+        ].join(':')
+    )
+      actionError.value = true;
   }
 };
+const closing = useAttendanceClosing({
+  props,
+  supportsClosing,
+  isVoice,
+  now,
+  showClosing: () => {
+    tab.value = 'CLOSING';
+  },
+  restoreSelection: record => {
+    if (
+      record.call_session_id &&
+      Number(record.call_session_id) !== props.currentCallId
+    )
+      emit('selectCall', { id: Number(record.call_session_id) });
+    if (
+      record.conversation_display_id &&
+      Number(record.conversation_display_id) !== props.currentConversationId
+    )
+      emit('selectConversation', {
+        id: Number(record.conversation_display_id),
+      });
+  },
+});
+const {
+  reason: closingReason,
+  result: closingResult,
+  note: closingNote,
+  pending: closingPending,
+  records: closingRecords,
+  error: closingError,
+  saving: closingSaving,
+  blocked: closingBlocked,
+  overdue: acwOverdue,
+  limit: acwLimitSeconds,
+  elapsed: acwElapsedSeconds,
+} = closing;
+const displayAgent = computed(() => closing.agent.value || agent.value);
+const pausedElapsed = computed(() => {
+  const seconds =
+    Math.max(
+      0,
+      Math.floor(
+        (now.value - new Date(displayAgent.value?.started_at).getTime()) / 1000
+      )
+    ) || 0;
+  return [
+    Math.floor(seconds / 3600),
+    Math.floor(seconds / 60) % 60,
+    seconds % 60,
+  ]
+    .map(value => String(value).padStart(2, '0'))
+    .join(':');
+});
+
+const formatSeconds = seconds =>
+  [Math.floor(seconds / 60), seconds % 60]
+    .map(value => String(value).padStart(2, '0'))
+    .join(':');
+watch(closing.attendance, value => {
+  if (
+    isVoice.value &&
+    value?.id === props.currentCallId &&
+    callDetails.value?.call
+  ) {
+    callDetails.value = {
+      ...callDetails.value,
+      call: { ...callDetails.value.call, ...value },
+    };
+  }
+});
+const startClosing = async () => {
+  if (!supportsClosing.value) return;
+  if (isVoice.value) {
+    const hangup = voiceActions.value.find(action => action.key === 'HANGUP');
+    if (!hangup?.enabled) {
+      actionError.value = true;
+      return;
+    }
+    const account = props.accountId;
+    const attendance = props.currentCallId;
+    const version = actionGeneration;
+    await runAction(hangup);
+    if (
+      version === actionGeneration &&
+      account === props.accountId &&
+      attendance === props.currentCallId
+    ) {
+      if (phoneError.value) actionError.value = true;
+      if (!actionError.value) await closing.load();
+    }
+    return;
+  }
+  await closing.start();
+};
+const finishClosing = async () => {
+  const key = [
+    props.accountId,
+    props.currentCallId,
+    props.currentConversationId,
+  ].join(':');
+  const persisted = await closing.complete();
+  if (
+    !persisted ||
+    key !==
+      [props.accountId, props.currentCallId, props.currentConversationId].join(
+        ':'
+      )
+  )
+    return;
+  if (isWhatsApp.value) {
+    store.commit('CHANGE_CONVERSATION_STATUS', {
+      conversationId: props.currentConversationId,
+      status: 'resolved',
+      snoozedUntil: null,
+    });
+  }
+  tab.value = 'CLOSING';
+  emit('refresh');
+};
+watch([() => call.value?.status, () => sip.hasCall.value], () => {
+  if (isVoice.value) closing.load();
+});
 const openQuick = kind => quickActions.value.open(kind);
 const insertReply = content => {
   if (isVoice.value) {
@@ -317,8 +465,9 @@ const qualify = async value => {
   if (isVoice.value) {
     tab.value = 'CASES';
     voiceSection.value = 'case';
+    const version = actionGeneration;
     await nextTick();
-    callWorkspace.value?.setCategory(value);
+    if (version === actionGeneration) callWorkspace.value?.setCategory(value);
   }
 };
 const showTab = value => {
@@ -326,14 +475,20 @@ const showTab = value => {
   customerDialog.value?.close();
 };
 const selectCall = value => {
+  if (!closing.allowSelection('voice', value.id)) return;
   listOpen.value = false;
   emit('selectCall', value);
 };
 const selectConversation = value => {
+  if (!closing.allowSelection('whatsapp', value.id)) return;
   listOpen.value = false;
   emit('selectConversation', value);
 };
 const loaded = value => {
+  if (value?.call?.id !== props.currentCallId) return;
+  if (closing.attendance.value?.id === value.call.id) {
+    value = { ...value, call: { ...value.call, ...closing.attendance.value } };
+  }
   callDetails.value = value;
   if (value?.agent) agent.value = value.agent;
 };
@@ -341,6 +496,7 @@ const loaded = value => {
 watch(
   () => [props.accountId, props.currentCallId, props.currentConversationId],
   () => {
+    actionGeneration += 1;
     tab.value = 'CONVERSATION';
     voiceSection.value = 'journey';
     callDetails.value = null;
@@ -368,6 +524,7 @@ watch(
   { immediate: true }
 );
 onBeforeUnmount(() => {
+  actionGeneration += 1;
   agentGeneration += 1;
   clearInterval(clock);
 });
@@ -410,7 +567,11 @@ onBeforeUnmount(() => {
           <span class="size-4" :class="action.icon" />
         </button>
       </template>
-      <MoreActions v-else-if="nativeConversationReady" class="shrink-0" />
+      <MoreActions
+        v-else-if="nativeConversationReady"
+        class="shrink-0"
+        :request-closing="requiresWhatsAppClosing ? startClosing : null"
+      />
       <button
         type="button"
         :disabled="!canOperate"
@@ -418,7 +579,7 @@ onBeforeUnmount(() => {
         @click="pauseDialog.open()"
       >
         <span class="i-lucide-pause size-3.5" />
-        {{ agent?.state === 'paused' ? labels.RESUME : labels.PAUSE }}
+        {{ displayAgent?.state === 'paused' ? labels.RESUME : labels.PAUSE }}
       </button>
       <span
         class="hidden shrink-0 items-center gap-2 border-l border-n-weak px-2 text-xs text-n-slate-11 2xl:flex"
@@ -426,20 +587,20 @@ onBeforeUnmount(() => {
         <span
           class="size-2 rounded-full"
           :class="
-            agent?.state === 'paused'
+            displayAgent?.state === 'paused'
               ? 'bg-n-amber-9'
-              : agent?.state === 'available'
+              : displayAgent?.state === 'available'
                 ? 'bg-n-teal-9'
                 : 'bg-n-slate-8'
           "
         />
         {{
-          agent?.state === 'paused'
+          displayAgent?.state === 'paused'
             ? t('JRC_CONTACT_CENTER.COMMON.CODE_DETAIL', {
                 code: pauseLabels[agent.reason_code],
                 detail: pausedElapsed,
               })
-            : agentLabels[agent?.state || 'offline']
+            : agentLabels[displayAgent?.state || 'offline']
         }}
       </span>
       <button
@@ -623,6 +784,32 @@ onBeforeUnmount(() => {
             {{ channel?.label }}
           </span>
           <button
+            v-if="
+              (isVoice && call && !['ended', 'failed'].includes(call.status)) ||
+              (requiresWhatsAppClosing && conversation?.status !== 'resolved')
+            "
+            type="button"
+            class="ml-auto flex h-8 shrink-0 items-center gap-2 rounded-md bg-n-ruby-9 px-3 text-xs font-semibold text-white hover:bg-n-ruby-10"
+            :disabled="
+              closingSaving ||
+              (isVoice &&
+                !voiceActions.find(action => action.key === 'HANGUP')?.enabled)
+            "
+            @click="startClosing"
+          >
+            <span
+              class="size-4"
+              :class="
+                isVoice ? 'i-lucide-phone-off' : 'i-lucide-message-square-off'
+              "
+            />
+            {{
+              isVoice
+                ? t('JRC_CONTACT_CENTER.INBOX_360.END_CALL')
+                : t('JRC_CONTACT_CENTER.INBOX_360.END_ATTENDANCE')
+            }}
+          </button>
+          <button
             type="button"
             class="grid size-7 shrink-0 place-items-center rounded-md bg-white/15 text-white xl:hidden"
             :aria-label="t('JRC_CONTACT_CENTER.INBOX_360.CUSTOMER')"
@@ -636,15 +823,7 @@ onBeforeUnmount(() => {
           :aria-label="t('JRC_CONTACT_CENTER.INBOX_360.WORKSPACE_TABS')"
         >
           <button
-            v-for="key in [
-              'CONVERSATION',
-              'SCRIPT',
-              'CUSTOMER_DATA',
-              'ORDERS',
-              'CASES',
-              'HISTORY',
-              'TASKS',
-            ]"
+            v-for="key in workspaceTabs"
             :key="key"
             type="button"
             class="shrink-0 border-b-2 px-2 py-2 text-[11px] font-medium transition"
@@ -756,9 +935,156 @@ onBeforeUnmount(() => {
             <Spinner />
           </div>
         </div>
+        <div
+          v-if="supportsClosing && tab === 'CLOSING'"
+          class="min-h-0 flex-1 overflow-y-auto p-4"
+        >
+          <div
+            v-if="closingError || closingBlocked"
+            role="alert"
+            class="mb-3 rounded-md bg-n-ruby-2 p-3 text-sm text-n-ruby-11"
+          >
+            {{
+              closingBlocked
+                ? t('JRC_CONTACT_CENTER.ACW_OPERATION.SELECTION_BLOCKED')
+                : t('JRC_CONTACT_CENTER.ACW_OPERATION.SAVE_ERROR')
+            }}
+          </div>
+          <div class="flex min-w-0 flex-col gap-4">
+            <section
+              v-if="closingPending"
+              class="rounded-xl border border-n-weak bg-n-solid-1 p-4"
+            >
+              <div
+                :class="
+                  acwOverdue
+                    ? 'bg-n-ruby-2 text-n-ruby-11'
+                    : 'bg-n-blue-2 text-n-blue-11'
+                "
+                class="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg p-3"
+              >
+                <span class="text-sm font-semibold">{{
+                  acwOverdue
+                    ? t('JRC_CONTACT_CENTER.ACW_OPERATION.OVERDUE')
+                    : t('JRC_CONTACT_CENTER.INBOX_360.ACW')
+                }}</span>
+                <span class="text-2xl font-bold tabular-nums">{{
+                  formatSeconds(acwElapsedSeconds)
+                }}</span>
+                <span class="w-full text-xs">{{
+                  t('JRC_CONTACT_CENTER.ACW_OPERATION.APPLIED_LIMIT', {
+                    time: formatSeconds(acwLimitSeconds),
+                  })
+                }}</span>
+                <progress
+                  class="h-2 w-full"
+                  :value="Math.min(acwElapsedSeconds, acwLimitSeconds)"
+                  :max="acwLimitSeconds"
+                />
+              </div>
+              <h3 class="m-0 text-sm font-semibold text-n-slate-12">
+                {{ t('JRC_CONTACT_CENTER.INBOX_360.CLOSING_TITLE') }}
+              </h3>
+              <p class="mt-1 text-xs text-n-slate-10">
+                {{ t('JRC_CONTACT_CENTER.INBOX_360.CLOSING_HISTORY') }}
+              </p>
+              <div class="mt-4 grid min-w-0 grid-cols-1 gap-3">
+                <label class="text-xs font-medium text-n-slate-11">
+                  {{ t('JRC_CONTACT_CENTER.ACW_OPERATION.REASON_REQUIRED') }}
+                  <select
+                    v-model="closingReason"
+                    class="mt-1 h-9 w-full rounded-md border border-n-weak bg-n-solid-1 px-2 text-xs"
+                  >
+                    <option value="">
+                      {{
+                        t(
+                          'JRC_CONTACT_CENTER.INBOX_360.CLOSING_REASON_PLACEHOLDER'
+                        )
+                      }}
+                    </option>
+                    <option value="resolved">
+                      {{ t('JRC_CONTACT_CENTER.INBOX_360.REASON_RESOLVED') }}
+                    </option>
+                    <option value="information">
+                      {{ t('JRC_CONTACT_CENTER.INBOX_360.REASON_INFORMATION') }}
+                    </option>
+                    <option value="order">
+                      {{ t('JRC_CONTACT_CENTER.INBOX_360.REASON_ORDER') }}
+                    </option>
+                    <option value="callback">
+                      {{ t('JRC_CONTACT_CENTER.INBOX_360.REASON_CALLBACK') }}
+                    </option>
+                    <option value="transfer">
+                      {{ t('JRC_CONTACT_CENTER.INBOX_360.REASON_TRANSFER') }}
+                    </option>
+                  </select>
+                </label>
+                <label class="text-xs font-medium text-n-slate-11">
+                  {{ t('JRC_CONTACT_CENTER.ACW_OPERATION.RESULT_REQUIRED') }}
+                  <select
+                    v-model="closingResult"
+                    class="mt-1 h-9 w-full rounded-md border border-n-weak bg-n-solid-1 px-2 text-xs"
+                  >
+                    <option value="">
+                      {{
+                        t(
+                          'JRC_CONTACT_CENTER.INBOX_360.CLOSING_RESULT_PLACEHOLDER'
+                        )
+                      }}
+                    </option>
+                    <option value="completed">
+                      {{ t('JRC_CONTACT_CENTER.INBOX_360.RESULT_COMPLETED') }}
+                    </option>
+                    <option value="pending">
+                      {{ t('JRC_CONTACT_CENTER.INBOX_360.RESULT_PENDING') }}
+                    </option>
+                    <option value="callback">
+                      {{ t('JRC_CONTACT_CENTER.INBOX_360.RESULT_CALLBACK') }}
+                    </option>
+                    <option value="forwarded">
+                      {{ t('JRC_CONTACT_CENTER.INBOX_360.RESULT_FORWARDED') }}
+                    </option>
+                  </select>
+                </label>
+              </div>
+              <label class="mt-3 block text-xs font-medium text-n-slate-11">
+                {{ t('JRC_CONTACT_CENTER.INBOX_360.CLOSING_NOTE') }}
+                <textarea
+                  v-model="closingNote"
+                  rows="5"
+                  class="mt-1 w-full resize-none rounded-md border border-n-weak bg-n-solid-1 p-3 text-xs"
+                  :placeholder="
+                    t('JRC_CONTACT_CENTER.INBOX_360.CLOSING_NOTE_PLACEHOLDER')
+                  "
+                />
+              </label>
+              <button
+                type="button"
+                :disabled="closingSaving || !closingReason || !closingResult"
+                class="mt-4 w-full rounded-md bg-n-brand px-4 py-2 text-xs font-semibold text-white disabled:opacity-40"
+                @click="finishClosing"
+              >
+                {{ t('JRC_CONTACT_CENTER.INBOX_360.FINISH_TABULATION') }}
+              </button>
+            </section>
+            <p
+              v-else-if="!closingRecords.some(record => record.completed_at)"
+              class="text-sm text-n-slate-11"
+            >
+              {{ t('JRC_CONTACT_CENTER.ACW_OPERATION.AWAITING_TERMINAL') }}
+            </p>
+            <QualificationHistory :records="closingRecords" />
+          </div>
+        </div>
+        <QualificationHistory
+          v-if="tab === 'HISTORY' && supportsClosing"
+          class="p-4"
+          :records="closingRecords"
+        />
         <InboxContextContent
           v-if="
             tab !== 'CONVERSATION' &&
+            tab !== 'CLOSING' &&
             !(isVoice && ['CASES', 'TASKS'].includes(tab))
           "
           :tab="tab"

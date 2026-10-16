@@ -8,6 +8,7 @@ import VisualMetricCard from '../components/visual/VisualMetricCard.vue';
 import VisualSectionCard from '../components/visual/VisualSectionCard.vue';
 import VisualStatusBadge from '../components/visual/VisualStatusBadge.vue';
 import StructureEditor from './StructureEditor.vue';
+import AcwPolicyEditor from '../components/AcwPolicyEditor.vue';
 
 const route = useRoute();
 const { t } = useI18n();
@@ -158,6 +159,10 @@ watch(accountId, load, { immediate: true });
     </div>
 
     <template v-else>
+      <AcwPolicyEditor
+        v-if="context?.capabilities?.configure"
+        :account-id="accountId"
+      />
       <VisualSectionCard
         v-if="context?.capabilities?.configure"
         class="mt-5"

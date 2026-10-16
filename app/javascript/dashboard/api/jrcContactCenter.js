@@ -9,6 +9,17 @@ const base = accountId => {
 };
 
 export default {
+  acwPolicy: accountId => axios.get(`${base(accountId)}/acw_policy`),
+  updateAcwPolicy: (accountId, limits) =>
+    axios.patch(`${base(accountId)}/acw_policy`, { limits }),
+  qualifications: (accountId, params) =>
+    axios.get(`${base(accountId)}/qualifications`, { params }),
+  startQualification: (accountId, params) =>
+    axios.post(`${base(accountId)}/qualifications`, params),
+  completeQualification: (accountId, id, qualification) =>
+    axios.patch(`${base(accountId)}/qualifications/${Number(id)}`, {
+      qualification,
+    }),
   agentState: accountId => axios.get(`${base(accountId)}/agent_state`),
   updateAgentState: (accountId, agentState) =>
     axios.patch(`${base(accountId)}/agent_state`, { agent_state: agentState }),

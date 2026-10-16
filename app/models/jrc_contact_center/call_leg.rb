@@ -14,8 +14,15 @@ class JrcContactCenter::CallLeg < JrcContactCenter::ApplicationRecord
   validates :direction, inclusion: { in: DIRECTIONS }
   validates :status, inclusion: { in: STATUSES }
   validate :timestamps_are_monotonic
+  after_save :ensure_operational_tabulation
 
   private
+
+  def ensure_operational_tabulation
+    return unless saved_change_to_status? || saved_change_to_answered_at? || saved_change_to_ended_at?
+
+    JrcContactCenter::QualificationManager.ensure_voice!(call_session)
+  end
 
   def timestamps_are_monotonic
     errors.add(:answered_at, 'must not be before started_at') if precedes?(answered_at, started_at)

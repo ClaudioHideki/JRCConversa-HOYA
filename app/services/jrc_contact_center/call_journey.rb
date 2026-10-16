@@ -129,6 +129,7 @@ class JrcContactCenter::CallJourney
 
   def agent_state(leg, state)
     return unless leg&.account_user
+    return if state == 'acw' && JrcContactCenter::Qualification.exists?(account: @account, call_session: @session, account_user: leg.account_user)
 
     JrcContactCenter::AgentStateManager.new(account: @account, account_user: leg.account_user).record_provider_event(
       state: state, occurred_at: @event.occurred_at, external_event_id: "journey:#{@event.id}:#{leg.account_user_id}",

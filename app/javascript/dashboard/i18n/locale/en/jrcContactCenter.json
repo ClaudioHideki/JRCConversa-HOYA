@@ -1356,7 +1356,7 @@
     },
     "INBOX": {
       "BACK_TO_LIST": "Voltar à caixa de entrada",
-      "TITLE": "Caixa de Entrada",
+      "TITLE": "Atendimento",
       "DESCRIPTIONS": {
         "ME": "Meus atendimentos abertos em todos os canais",
         "UNASSIGNED": "Atendimentos ainda não atribuídos",
@@ -1397,7 +1397,8 @@
       "ADMINISTRACAO": "Administração",
       "OUTROS_RECURSOS": "Outros recursos",
       "OPERACOES": "Operações",
-      "CANAIS_ADICIONAIS": "Canais adicionais"
+      "CANAIS_ADICIONAIS": "Canais adicionais",
+      "ATTENDANCE": "Atendimento"
     },
     "INBOX_360": {
       "ACTIVE_INTERACTIONS": "Atendimentos em andamento",
@@ -1499,7 +1500,75 @@
         "canceled": "Cancelada"
       },
       "PHONE_CONFIRMATION": "Aguardando confirmação da telefonia.",
-      "PAUSE_HINT": "Selecione um motivo para registrar a pausa. A disponibilidade depende da confirmação da telefonia."
+      "PAUSE_HINT": "Selecione um motivo para registrar a pausa. A disponibilidade depende da confirmação da telefonia.",
+      "CLOSING": "Encerramento",
+      "END_CALL": "Encerrar chamada",
+      "END_ATTENDANCE": "Encerrar atendimento",
+      "CLOSING_TITLE": "Tabulação do atendimento",
+      "CLOSING_REASON": "Motivo de encerramento",
+      "CLOSING_RESULT": "Resultado",
+      "CLOSING_NOTE": "Observação",
+      "CLOSING_REASON_PLACEHOLDER": "Selecione um motivo",
+      "CLOSING_RESULT_PLACEHOLDER": "Selecione um resultado",
+      "CLOSING_NOTE_PLACEHOLDER": "Adicione uma observação (opcional)",
+      "FINISH_TABULATION": "Finalizar tabulação",
+      "ACW": "Pós-atendimento (ACW)",
+      "ACW_LIMIT": "Tempo para encerrar: {time}",
+      "ACW_HINT": "Após finalizar a tabulação, o próximo atendimento poderá ser carregado.",
+      "CLOSING_HISTORY": "A tabulação registra o motivo e o resultado antes de liberar o próximo atendimento.",
+      "REASON_RESOLVED": "Resolvido no atendimento",
+      "REASON_INFORMATION": "Orientação / informação",
+      "REASON_ORDER": "Consulta de pedido",
+      "REASON_CALLBACK": "Retorno necessário",
+      "REASON_TRANSFER": "Transferido",
+      "RESULT_COMPLETED": "Concluído",
+      "RESULT_PENDING": "Pendente",
+      "RESULT_CALLBACK": "Agendado retorno",
+      "RESULT_FORWARDED": "Encaminhado"
+    },
+    "ACW_OPERATION": {
+      "HISTORY_OVERDUE": "Limite excedido",
+      "SELECTION_BLOCKED": "Conclua a tabulação pendente antes de selecionar outro atendimento.",
+      "SAVE_ERROR": "Não foi possível confirmar a tabulação. Os dados foram preservados; tente novamente.",
+      "OVERDUE": "Limite excedido — tabulação obrigatória",
+      "APPLIED_LIMIT": "Limite aplicado: {time}",
+      "REASON_REQUIRED": "Motivo de encerramento (obrigatório)",
+      "RESULT_REQUIRED": "Resultado (obrigatório)",
+      "HISTORY": "Histórico da tabulação",
+      "COMPLETED": "Atendimento encerrado",
+      "CHANNEL": "Canal",
+      "CHANNELS": {
+        "voice": "Voz",
+        "whatsapp": "WhatsApp"
+      },
+      "AGENT": "Agente",
+      "DURATION": "Tempo de tabulação",
+      "ATTENDANCE_DURATION": "Tempo de atendimento",
+      "STATUS": "Status ACW",
+      "WITHIN_LIMIT": "Dentro do limite",
+      "AWAITING_TERMINAL": "Aguarde a confirmação do término da chamada. Nenhum ACW é iniciado antes da confirmação operacional.",
+      "POLICY_TITLE": "Pós-atendimento / Tabulação",
+      "POLICY_REQUIRED": "Motivo e resultado são obrigatórios. O limite gera alerta de atraso e não libera o agente automaticamente.",
+      "LIMIT_LABELS": {
+        "voice": "Tempo máximo de tabulação — Voz (segundos)",
+        "whatsapp": "Tempo máximo de tabulação — WhatsApp (segundos)"
+      },
+      "SAVE_POLICY": "Salvar política de tabulação",
+      "POLICY_SAVED": "Política de tabulação salva.",
+      "SUPERVISOR_DETAIL": "{channel} · atendimento #{id} · {elapsed}s / limite {limit}s",
+      "REASONS": {
+        "resolved": "Resolvido no atendimento",
+        "information": "Orientação / informação",
+        "order": "Consulta de pedido",
+        "callback": "Retorno necessário",
+        "transfer": "Transferido"
+      },
+      "RESULTS": {
+        "completed": "Concluído",
+        "pending": "Pendente",
+        "callback": "Agendado retorno",
+        "forwarded": "Encaminhado"
+      }
     }
   }
 }

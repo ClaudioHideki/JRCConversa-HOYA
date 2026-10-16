@@ -19,6 +19,7 @@ class JrcContactCenter::CallSession < JrcContactCenter::ApplicationRecord
   validates :status, inclusion: { in: STATUSES }
   validate :timestamps_are_monotonic
   after_update :track_closure_survey
+  after_update :ensure_operational_tabulation
   after_update_commit :enqueue_closure_survey
 
   def f1_data
@@ -30,6 +31,12 @@ class JrcContactCenter::CallSession < JrcContactCenter::ApplicationRecord
   end
 
   private
+
+  def ensure_operational_tabulation
+    return unless saved_change_to_status? || saved_change_to_answered_at? || saved_change_to_ended_at?
+
+    JrcContactCenter::QualificationManager.ensure_voice!(self)
+  end
 
   def track_closure_survey
     @closure_survey_pending = true if saved_change_to_status? || saved_change_to_answered_at? || saved_change_to_ended_at?

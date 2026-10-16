@@ -14,10 +14,33 @@ vi.mock('dashboard/routes/dashboard/webphone/useSipWebphone', () => ({
   useSipWebphone: vi.fn(),
 }));
 vi.mock('dashboard/api/jrcContactCenter', () => ({
-  default: { agentState: vi.fn() },
+  default: {
+    agentState: vi.fn(),
+    qualifications: vi.fn(),
+    startQualification: vi.fn(),
+    completeQualification: vi.fn(),
+  },
 }));
 enableAutoUnmount(afterEach);
 let sip;
+const pendingResponse = {
+  data: {
+    items: [
+      {
+        id: 11,
+        account_id: 1,
+        account_user_id: 9,
+        channel: 'voice',
+        call_session_id: 7,
+        started_at: new Date().toISOString(),
+        completed_at: null,
+        acw_limit_seconds: 40,
+      },
+    ],
+    agent: { account_user_id: 9, pending_qualifications: [] },
+    policy: { limits: { voice: 40, whatsapp: 50 } },
+  },
+};
 const props = {
   accountId: 1,
   currentCallId: 7,
@@ -84,6 +107,13 @@ describe('inbox native SIP action guards', () => {
       connect: vi.fn(),
     };
     useSipWebphone.mockReturnValue(sip);
+    CCAPI.qualifications.mockResolvedValue({
+      data: {
+        items: [],
+        agent: { account_user_id: 9, pending_qualifications: [] },
+        policy: { limits: { voice: 40, whatsapp: 50 } },
+      },
+    });
     CCAPI.agentState.mockResolvedValue({
       data: { item: { state: 'available' } },
     });
@@ -190,6 +220,123 @@ describe('inbox native SIP action guards', () => {
     await flushPromises();
     expect(wrapper.get('[role="alert"]').text()).toBe(
       'Native phone could not hold'
+    );
+  });
+
+  it('requires ACW after the native hangup control and terminal confirmation', async () => {
+    sip.hangup.mockImplementation(async () => {
+      CCAPI.qualifications.mockResolvedValue(pendingResponse);
+      sip.hasCall.value = false;
+      sip.established.value = false;
+    });
+    const wrapper = mount(HoyaInboxWorkspace, { props, global });
+    await flushPromises();
+    wrapper.findComponent({ name: 'CallWorkspace' }).vm.$emit('loaded', {
+      call: { id: 7, external_session_id: 'native-7', status: 'connected' },
+      customer: { contacts: [] },
+    });
+    await flushPromises();
+    expect(wrapper.find('progress').exists()).toBe(false);
+    await wrapper
+      .get('button[aria-label="JRC_CONTACT_CENTER.INBOX_360.HANGUP"]')
+      .trigger('click');
+    await flushPromises();
+    expect(wrapper.find('progress').exists()).toBe(true);
+  });
+  it('requires ACW when a voice call ends remotely', async () => {
+    const wrapper = mount(HoyaInboxWorkspace, { props, global });
+    await flushPromises();
+    const native = wrapper.findComponent({ name: 'CallWorkspace' });
+    native.vm.$emit('loaded', {
+      call: { id: 7, external_session_id: 'native-7', status: 'connected' },
+      customer: { contacts: [] },
+    });
+    await flushPromises();
+    CCAPI.qualifications.mockResolvedValue(pendingResponse);
+    sip.hasCall.value = false;
+    sip.established.value = false;
+    native.vm.$emit('loaded', {
+      call: { id: 7, external_session_id: 'native-7', status: 'ended' },
+      customer: { contacts: [] },
+    });
+    await flushPromises();
+    expect(wrapper.find('progress').exists()).toBe(true);
+  });
+  it('restores required tabulation when reopening an ended voice interaction', async () => {
+    CCAPI.qualifications.mockResolvedValue(pendingResponse);
+    const wrapper = mount(HoyaInboxWorkspace, { props, global });
+    await flushPromises();
+    wrapper.findComponent({ name: 'CallWorkspace' }).vm.$emit('loaded', {
+      call: { id: 7, external_session_id: 'native-7', status: 'ended' },
+      customer: { contacts: [] },
+    });
+    await flushPromises();
+    expect(wrapper.find('progress').exists()).toBe(true);
+  });
+  it.each([
+    'Channel::Email',
+    'Channel::Instagram',
+    'Channel::Facebook',
+    'Channel::Api',
+  ])('does not show Encerramento for %s', async channelType => {
+    const wrapper = mount(HoyaInboxWorkspace, {
+      props: {
+        ...props,
+        currentCallId: null,
+        currentConversationId: 21,
+        conversations: [{ id: 21, inbox_id: 1 }],
+        inboxFor: () => ({ channel_type: channelType }),
+      },
+      global,
+    });
+    await flushPromises();
+    expect(wrapper.text()).not.toContain(
+      'JRC_CONTACT_CENTER.INBOX_360.CLOSING'
+    );
+  });
+  it.each([
+    { channel_type: 'Channel::Whatsapp' },
+    { channel_type: 'Channel::TwilioSms', medium: 'whatsapp' },
+  ])(
+    'places Encerramento after Tasks in supported WhatsApp transport',
+    async inbox => {
+      const wrapper = mount(HoyaInboxWorkspace, {
+        props: {
+          ...props,
+          currentCallId: null,
+          currentConversationId: 21,
+          conversations: [{ id: 21, inbox_id: 1 }],
+          inboxFor: () => inbox,
+        },
+        global,
+      });
+      await flushPromises();
+      const text = wrapper
+        .get('nav[aria-label="JRC_CONTACT_CENTER.INBOX_360.WORKSPACE_TABS"]')
+        .text();
+      expect(
+        text.indexOf('JRC_CONTACT_CENTER.INBOX_360.CLOSING')
+      ).toBeGreaterThan(text.indexOf('JRC_CONTACT_CENTER.INBOX_360.TASKS'));
+    }
+  );
+  it('keeps API bridges outside required tabulation even when their presentation is WhatsApp', async () => {
+    const wrapper = mount(HoyaInboxWorkspace, {
+      props: {
+        ...props,
+        currentCallId: null,
+        currentConversationId: 21,
+        conversations: [{ id: 21, inbox_id: 1 }],
+        inboxFor: () => ({
+          channel_type: 'Channel::Api',
+          name: 'WhatsApp bridge',
+          additional_attributes: { provider: 'evolution' },
+        }),
+      },
+      global,
+    });
+    await flushPromises();
+    expect(wrapper.text()).not.toContain(
+      'JRC_CONTACT_CENTER.INBOX_360.CLOSING'
     );
   });
 });

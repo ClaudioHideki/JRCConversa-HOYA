@@ -20,7 +20,8 @@ class JrcContactCenter::CustomerContext
 
   def module_context(user_context:, access:)
     policy = JrcContactCenter::ModulePolicy.new(user_context, :contact_center)
-    { feature: 'jrc_contact_center', capabilities: module_capabilities(policy), provider: provider_context, counts: module_counts(access) }
+    { feature: 'jrc_contact_center', capabilities: module_capabilities(policy), provider: provider_context, counts: module_counts(access),
+      acw_policy: JrcContactCenter::AcwPolicy.new(account: @account).call }
   end
 
   private

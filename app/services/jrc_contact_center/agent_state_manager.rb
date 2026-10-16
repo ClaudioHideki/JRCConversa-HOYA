@@ -69,6 +69,9 @@ class JrcContactCenter::AgentStateManager
     raise JrcContactCenter::OperationError.new('state_conflict', status: :conflict) unless state.version == expected_version.to_s
 
     previous = state.current
+    if attributes[:state] == 'available' && JrcContactCenter::Qualification.pending.exists?(account: @account, account_user: @member)
+      raise JrcContactCenter::OperationError.new('tabulation_pending', status: :conflict)
+    end
     blocked = state.active_call? || %w[busy ringing in_call].include?(previous&.state)
     raise JrcContactCenter::OperationError.new('call_active', status: :conflict) if blocked
 
@@ -94,6 +97,9 @@ class JrcContactCenter::AgentStateManager
     end
 
     return if previous.ended_at
+    if previous.state == 'acw' && JrcContactCenter::Qualification.pending.exists?(account: @account, account_user: @member)
+      return
+    end
 
     previous.update!(ended_at: event.started_at)
     session_id = previous.metadata['jrc_call_session_id']
