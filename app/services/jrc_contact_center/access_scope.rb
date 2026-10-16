@@ -39,8 +39,21 @@ class JrcContactCenter::AccessScope
     relation = JrcContactCenter::CallSession.where(account: account)
     return relation if full_access?
 
-    agent_sessions = JrcContactCenter::CallLeg.where(account: account, account_user_id: account_user.id).select(:call_session_id)
-    relation.where(current_queue_id: queue_ids).or(relation.where(id: agent_sessions))
+    relation.where(id: my_call_session_ids)
+  end
+
+  def my_call_sessions
+    JrcContactCenter::CallSession.where(account: account, id: my_call_session_ids)
+  end
+
+  def unassigned_call_sessions
+    return JrcContactCenter::CallSession.none unless full_access?
+
+    assigned_ids = JrcContactCenter::CallLeg
+                   .where(account: account)
+                   .where.not(account_user_id: nil)
+                   .select(:call_session_id)
+    JrcContactCenter::CallSession.where(account: account).where.not(id: assigned_ids)
   end
 
   def cases
@@ -62,5 +75,13 @@ class JrcContactCenter::AccessScope
     return relation if full_access?
 
     relation.where(queue_id: queue_ids).or(relation.where(account_user_id: account_user.id))
+  end
+
+  private
+
+  def my_call_session_ids
+    JrcContactCenter::CallLeg
+      .where(account: account, account_user_id: account_user.id)
+      .select(:call_session_id)
   end
 end

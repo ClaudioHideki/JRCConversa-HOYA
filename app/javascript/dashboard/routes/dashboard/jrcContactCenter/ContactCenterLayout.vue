@@ -29,7 +29,7 @@ const canReport = computed(
 
 const navigationGroups = computed(() => [
   {
-    label: t('JRC_CONTACT_CENTER.NAV_GROUPS.ATTENDANCE'),
+    label: t('JRC_CONTACT_CENTER.NAV_GROUPS.AGENT'),
     items: [
       {
         name: 'jrc_contact_center_cockpit',
@@ -50,12 +50,6 @@ const navigationGroups = computed(() => [
         visible: true,
       },
       {
-        name: 'jrc_contact_center_occurrences',
-        label: t('JRC_CONTACT_CENTER.NAV.OCCURRENCES'),
-        icon: 'i-lucide-clipboard-list',
-        visible: true,
-      },
-      {
         name: 'jrc_contact_center_customer_360',
         label: t('JRC_CONTACT_CENTER.NAV.CUSTOMER_360'),
         icon: 'i-lucide-orbit',
@@ -64,7 +58,7 @@ const navigationGroups = computed(() => [
     ],
   },
   {
-    label: t('JRC_CONTACT_CENTER.NAV_GROUPS.OPERATION'),
+    label: t('JRC_CONTACT_CENTER.NAV_GROUPS.SUPERVISOR'),
     items: [
       {
         name: 'jrc_contact_center_supervisor',
@@ -84,22 +78,16 @@ const navigationGroups = computed(() => [
         icon: 'i-lucide-map',
         visible: canSupervise.value,
       },
+    ],
+  },
+  {
+    label: t('JRC_CONTACT_CENTER.NAV_GROUPS.CONTROL_DESK'),
+    items: [
       {
         name: 'jrc_contact_center_control_desk',
         label: t('JRC_CONTACT_CENTER.NAV.CONTROL_DESK'),
         icon: 'i-lucide-radar',
         visible: canSupervise.value,
-      },
-    ],
-  },
-  {
-    label: t('JRC_CONTACT_CENTER.NAV_GROUPS.TELEPHONY'),
-    items: [
-      {
-        name: 'jrc_contact_center_ivr',
-        label: t('JRC_CONTACT_CENTER.NAV.IVR'),
-        icon: 'i-lucide-git-branch',
-        visible: canConfigure.value,
       },
       {
         name: 'jrc_contact_center_order_lookup',
@@ -114,16 +102,22 @@ const navigationGroups = computed(() => [
         visible: canSupervise.value,
       },
       {
+        name: 'jrc_contact_center_migration',
+        label: t('JRC_CONTACT_CENTER.NAV.MIGRATION'),
+        icon: 'i-lucide-workflow',
+        visible: canConfigure.value,
+      },
+    ],
+  },
+  {
+    label: t('JRC_CONTACT_CENTER.NAV_GROUPS.MONITORING'),
+    items: [
+      {
         name: 'jrc_contact_center_recordings',
         label: t('JRC_CONTACT_CENTER.NAV.RECORDINGS'),
         icon: 'i-lucide-audio-waveform',
         visible: canReport.value,
       },
-    ],
-  },
-  {
-    label: t('JRC_CONTACT_CENTER.NAV_GROUPS.MANAGEMENT'),
-    items: [
       {
         name: 'jrc_contact_center_reports',
         label: t('JRC_CONTACT_CENTER.NAV.REPORTS'),
@@ -136,22 +130,33 @@ const navigationGroups = computed(() => [
         icon: 'i-lucide-message-circle-heart',
         visible: canReport.value,
       },
-      {
-        name: 'jrc_contact_center_security',
-        label: t('JRC_CONTACT_CENTER.NAV.SECURITY'),
-        icon: 'i-lucide-shield-check',
-        visible: canConfigure.value,
-      },
-      {
-        name: 'jrc_contact_center_migration',
-        label: t('JRC_CONTACT_CENTER.NAV.MIGRATION'),
-        icon: 'i-lucide-workflow',
-        visible: canConfigure.value,
-      },
+    ],
+  },
+  {
+    label: t('JRC_CONTACT_CENTER.NAV_GROUPS.SETTINGS'),
+    items: [
       {
         name: 'jrc_contact_center_settings',
         label: t('JRC_CONTACT_CENTER.NAV.SETTINGS'),
         icon: 'i-lucide-settings',
+        visible: canConfigure.value,
+      },
+      {
+        name: 'jrc_contact_center_ivr',
+        label: t('JRC_CONTACT_CENTER.NAV.IVR'),
+        icon: 'i-lucide-git-branch',
+        visible: canConfigure.value,
+      },
+      {
+        name: 'ramal_index',
+        label: t('JRC_CONTACT_CENTER.NAV.EXTENSIONS'),
+        icon: 'i-lucide-phone',
+        visible: canConfigure.value,
+      },
+      {
+        name: 'jrc_contact_center_security',
+        label: t('JRC_CONTACT_CENTER.NAV.SECURITY'),
+        icon: 'i-lucide-shield-check',
         visible: canConfigure.value,
       },
     ],

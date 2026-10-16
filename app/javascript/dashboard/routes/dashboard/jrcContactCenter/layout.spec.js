@@ -89,4 +89,36 @@ describe('Contact Center account navigation', () => {
     await flushPromises();
     expect(wrapper.get('[data-testid="account-view"]').text()).toBe('2');
   });
+  it('separates authorized navigation and keeps occurrences in CRM', async () => {
+    JrcContactCenterAPI.context.mockResolvedValue({
+      data: {
+        capabilities: { supervise: true, configure: true, reports: true },
+      },
+    });
+    const wrapper = mount(ContactCenterLayout, {
+      global: { stubs: { RouterLink: true, RouterView: true } },
+    });
+    await flushPromises();
+    ['AGENT', 'SUPERVISOR', 'CONTROL_DESK', 'MONITORING', 'SETTINGS'].forEach(
+      group => {
+        expect(wrapper.text()).toContain(
+          `JRC_CONTACT_CENTER.NAV_GROUPS.${group}`
+        );
+      }
+    );
+    expect(wrapper.text()).not.toContain('JRC_CONTACT_CENTER.NAV.OCCURRENCES');
+  });
+
+  it('keeps ordinary agent navigation limited to the four attendance pages', async () => {
+    const wrapper = mount(ContactCenterLayout, {
+      global: { stubs: { RouterLink: true, RouterView: true } },
+    });
+    await flushPromises();
+    const links = wrapper.findAllComponents({ name: 'RouterLink' });
+    expect(links.map(link => link.attributes('to'))).toHaveLength(4);
+    expect(wrapper.text()).toContain('JRC_CONTACT_CENTER.NAV_GROUPS.AGENT');
+    expect(wrapper.text()).not.toContain(
+      'JRC_CONTACT_CENTER.NAV_GROUPS.SUPERVISOR'
+    );
+  });
 });

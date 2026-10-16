@@ -104,7 +104,8 @@ RSpec.describe 'JRC Contact Center F1 operations', type: :request do
                              params: { command: { action: 'transfer_blind', command_id: 'peer-transfer', call_session_id: session.id,
                                                   expected_state_version: session.lock_version, parameters: { destination: '1001' } } }
 
-    expect(response).to have_http_status(:unauthorized)
+    expect(response).to have_http_status(:not_found)
+    expect(response.body).not_to include(session.correlation_id)
     expect(JrcContactCenter::Command.where(account: account)).to be_empty
   end
 end

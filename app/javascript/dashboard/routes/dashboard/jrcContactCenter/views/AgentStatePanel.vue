@@ -12,11 +12,33 @@ const props = defineProps({
 });
 const { t } = useI18n();
 const labels = computed(() => agentStateLabels(t));
+const pauseReasons = computed(() =>
+  Object.entries({
+    bathroom: t('JRC_CONTACT_CENTER.AGENT.PAUSE_REASONS.bathroom'),
+    coffee: t('JRC_CONTACT_CENTER.AGENT.PAUSE_REASONS.coffee'),
+    lunch: t('JRC_CONTACT_CENTER.AGENT.PAUSE_REASONS.lunch'),
+    meeting: t('JRC_CONTACT_CENTER.AGENT.PAUSE_REASONS.meeting'),
+    training: t('JRC_CONTACT_CENTER.AGENT.PAUSE_REASONS.training'),
+    feedback: t('JRC_CONTACT_CENTER.AGENT.PAUSE_REASONS.feedback'),
+    backoffice: t('JRC_CONTACT_CENTER.AGENT.PAUSE_REASONS.backoffice'),
+    internal_support: t(
+      'JRC_CONTACT_CENTER.AGENT.PAUSE_REASONS.internal_support'
+    ),
+    technical_issue: t(
+      'JRC_CONTACT_CENTER.AGENT.PAUSE_REASONS.technical_issue'
+    ),
+    rest: t('JRC_CONTACT_CENTER.AGENT.PAUSE_REASONS.rest'),
+    end_shift: t('JRC_CONTACT_CENTER.AGENT.PAUSE_REASONS.end_shift'),
+  }).map(([code, label]) => ({ code, label }))
+);
 const state = ref(null);
 const busy = ref(false);
 const failed = ref(false);
 const reason = ref('');
 const queueId = ref('');
+const hasValidPauseReason = computed(() =>
+  pauseReasons.value.some(item => item.code === reason.value)
+);
 let generation = 0;
 
 const stateTone = computed(() => {
@@ -61,7 +83,13 @@ const load = async () => {
   queueId.value = '';
   try {
     const response = await JrcContactCenterAPI.agentState(props.accountId);
-    if (version === generation) state.value = response.data.item;
+    if (version === generation) {
+      state.value = response.data.item;
+      reason.value =
+        response.data.item?.state === 'paused'
+          ? response.data.item.reason_code || ''
+          : '';
+    }
   } catch {
     if (version === generation) failed.value = true;
   } finally {
@@ -71,7 +99,7 @@ const load = async () => {
 
 const transition = async nextState => {
   if (!props.canOperate || busy.value || !state.value) return;
-  if (nextState === 'paused' && !reason.value.trim()) return;
+  if (nextState === 'paused' && !hasValidPauseReason.value) return;
   const version = generation;
   busy.value = true;
   failed.value = false;
@@ -221,13 +249,23 @@ watch(() => props.accountId, load, { immediate: true });
               <span class="text-xs font-semibold text-n-slate-10">
                 {{ t('JRC_CONTACT_CENTER.AGENT.REASON') }}
               </span>
-              <input
+              <select
                 v-model="reason"
                 :disabled="busy"
                 :aria-label="t('JRC_CONTACT_CENTER.AGENT.REASON')"
-                :placeholder="t('JRC_CONTACT_CENTER.AGENT.REASON')"
                 class="w-full rounded-xl border border-n-weak bg-n-solid-1 px-3 py-2.5 text-sm text-n-slate-12 outline-none transition focus:border-n-blue-7 focus:ring-2 focus:ring-n-blue-3"
-              />
+              >
+                <option value="">
+                  {{ t('JRC_CONTACT_CENTER.AGENT.PAUSE_PLACEHOLDER') }}
+                </option>
+                <option
+                  v-for="pauseReason in pauseReasons"
+                  :key="pauseReason.code"
+                  :value="pauseReason.code"
+                >
+                  {{ pauseReason.label }}
+                </option>
+              </select>
             </label>
           </div>
           <div class="flex flex-wrap gap-2">
@@ -235,7 +273,9 @@ watch(() => props.accountId, load, { immediate: true });
               v-for="item in transitions"
               :key="item.state"
               type="button"
-              :disabled="busy || (item.state === 'paused' && !reason.trim())"
+              :disabled="
+                busy || (item.state === 'paused' && !hasValidPauseReason)
+              "
               class="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
               :class="item.className"
               @click="transition(item.state)"

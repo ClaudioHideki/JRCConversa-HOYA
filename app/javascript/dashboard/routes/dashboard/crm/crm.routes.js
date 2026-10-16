@@ -27,6 +27,8 @@ const Customer360View = () => import('./views/customers/Customer360View.vue');
 const BackofficeView = () => import('./views/backoffice/BackofficeView.vue');
 const ManagementView = () => import('./views/management/ManagementView.vue');
 const CrmSettingsView = () => import('./views/settings/CrmSettingsView.vue');
+const CrmOccurrencesView = () =>
+  import('../jrcContactCenter/views/OccurrencesPage.vue');
 
 const CrmFieldLayout = () => import('./views/field/CrmFieldLayout.vue');
 const CrmFieldPage = () => import('./views/field/CrmFieldPage.vue');
@@ -90,6 +92,15 @@ export default {
           meta,
         },
         { path: 'wallet', name: 'crm_wallet', component: WalletView, meta },
+        {
+          path: 'occurrences',
+          name: 'crm_occurrences',
+          component: CrmOccurrencesView,
+          meta: {
+            ...meta,
+            featureFlag: FEATURE_FLAGS.JRC_CONTACT_CENTER,
+          },
+        },
 
         {
           path: 'field',

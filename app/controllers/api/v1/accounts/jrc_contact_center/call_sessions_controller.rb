@@ -3,7 +3,7 @@
 class Api::V1::Accounts::JrcContactCenter::CallSessionsController < Api::V1::Accounts::JrcContactCenter::BaseController
   def index
     authorize_contact_center!
-    calls = contact_center_access.call_sessions.order(started_at: :desc).limit(limit)
+    calls = scoped_calls.order(started_at: :desc).limit(limit)
     calls = calls.where(status: params[:status]) if params[:status].present?
     render json: base_payload.merge(items: calls.map { |call| serialize(call) })
   end
@@ -15,6 +15,14 @@ class Api::V1::Accounts::JrcContactCenter::CallSessionsController < Api::V1::Acc
   end
 
   private
+
+  def scoped_calls
+    return contact_center_access.my_call_sessions unless contact_center_access.full_access?
+    return contact_center_access.unassigned_call_sessions if params[:assignee_type] == 'unassigned'
+    return contact_center_access.my_call_sessions if params[:assignee_type] == 'me'
+
+    contact_center_access.call_sessions
+  end
 
   def limit
     params.fetch(:limit, 50).to_i.clamp(1, 200)

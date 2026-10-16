@@ -17,6 +17,20 @@
         "in_call": "Em chamada",
         "acw": "Pos-atendimento",
         "unavailable": "Indisponivel"
+      },
+      "PAUSE_PLACEHOLDER": "Selecione o motivo da pausa",
+      "PAUSE_REASONS": {
+        "bathroom": "Banheiro",
+        "coffee": "Café",
+        "lunch": "Almoço",
+        "meeting": "Reunião",
+        "training": "Treinamento",
+        "feedback": "Feedback / Monitoria",
+        "backoffice": "Backoffice",
+        "internal_support": "Suporte interno",
+        "technical_issue": "Problema técnico",
+        "rest": "Descanso",
+        "end_shift": "Fim de turno"
       }
     },
     "CALL": {
@@ -59,7 +73,8 @@
       "RECORDINGS": "Gravações e qualidade",
       "SURVEYS": "Pesquisas",
       "SECURITY": "Segurança e perfis",
-      "MIGRATION": "Painel de migração"
+      "MIGRATION": "Painel de migração",
+      "EXTENSIONS": "Ramais"
     },
     "CARDS": {
       "UNITS": "Unidades",
@@ -162,7 +177,12 @@
       "ATTENDANCE": "Atendimento",
       "OPERATION": "Operação",
       "TELEPHONY": "Telefonia",
-      "MANAGEMENT": "Gestão"
+      "MANAGEMENT": "Gestão",
+      "AGENT": "Atendente",
+      "SUPERVISOR": "Supervisor",
+      "CONTROL_DESK": "Control Desk",
+      "MONITORING": "Monitoria",
+      "SETTINGS": "Configurações"
     },
     "VISUAL": {
       "UNCONFIRMED_COMPANY": "Ótica não confirmada",
@@ -1333,6 +1353,51 @@
       "LABEL_1163": "Em acompanhamento",
       "LABEL_1164": "Prazo programado",
       "LABEL_1165": "No período carregado"
+    },
+    "INBOX": {
+      "BACK_TO_LIST": "Voltar à caixa de entrada",
+      "TITLE": "Caixa de Entrada",
+      "DESCRIPTIONS": {
+        "ME": "Meus atendimentos abertos em todos os canais",
+        "UNASSIGNED": "Atendimentos ainda não atribuídos",
+        "ALL": "Todos os atendimentos autorizados"
+      },
+      "OPEN_CONVERSATION_HUB": "Abrir central de conversas",
+      "EXPAND_LIST": "Expandir lista",
+      "COLLAPSE_LIST": "Recolher lista",
+      "SEARCH": "Buscar conversas ou contatos...",
+      "ASSIGNEE_FILTER_LABEL": "Filtrar atendimentos por responsável",
+      "CHANNEL_FILTER_LABEL": "Filtrar atendimentos por canal",
+      "EMPTY": "Nenhum atendimento aberto neste canal.",
+      "LOAD_MORE": "Carregar mais atendimentos",
+      "CALL_WORKSPACE": "Atendimento de voz",
+      "ASSIGNEE": {
+        "ME": "Minhas",
+        "UNASSIGNED": "Não atribuídas",
+        "ALL": "Todas"
+      },
+      "CHANNELS": {
+        "ALL": "Todos os canais",
+        "VOICE": "Voz",
+        "SOCIAL": "Redes sociais"
+      },
+      "DIRECTIONS": {
+        "INBOUND": "Recebida",
+        "OUTBOUND": "Realizada"
+      }
+    },
+    "NAVIGATION": {
+      "CRM_HOYA_360": "CRM HOYA 360°",
+      "VISAO_GERAL": "Visão geral",
+      "CLIENTES_OTICAS": "Clientes / Óticas",
+      "RELATORIOS": "Relatórios",
+      "CALL_CENTER": "Call Center",
+      "WHATSAPP_CALLING": "WhatsApp Calling",
+      "INTELIGENCIA": "Inteligência",
+      "ADMINISTRACAO": "Administração",
+      "OUTROS_RECURSOS": "Outros recursos",
+      "OPERACOES": "Operações",
+      "CANAIS_ADICIONAIS": "Canais adicionais"
     }
   }
 }

@@ -42,7 +42,9 @@ describe('AgentStatePanel', () => {
     await flushPromises();
     const pause = wrapper.findAll('button')[1];
     expect(pause.attributes('disabled')).toBeDefined();
-    await wrapper.find('input').setValue('break');
+    await wrapper
+      .get('select[aria-label="JRC_CONTACT_CENTER.AGENT.REASON"]')
+      .setValue('coffee');
     expect(pause.attributes('disabled')).toBeUndefined();
   });
 
@@ -63,5 +65,87 @@ describe('AgentStatePanel', () => {
     expect(wrapper.text()).not.toContain(
       'JRC_CONTACT_CENTER.AGENT.STATES.in_call'
     );
+  });
+
+  it('offers the eleven structured reasons and sends the selected reason_code before resuming', async () => {
+    JrcContactCenterAPI.updateAgentState
+      .mockResolvedValueOnce({
+        data: {
+          item: {
+            ...initialState,
+            state: 'paused',
+            state_version: '1',
+            reason_code: 'coffee',
+          },
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          item: { ...initialState, state: 'available', state_version: '2' },
+        },
+      });
+    const wrapper = mount(AgentStatePanel, {
+      props: { accountId: '1', canOperate: true },
+    });
+    await flushPromises();
+    const reasons = wrapper.get(
+      'select[aria-label="JRC_CONTACT_CENTER.AGENT.REASON"]'
+    );
+    expect(
+      reasons.findAll('option').map(option => option.element.value)
+    ).toEqual([
+      '',
+      'bathroom',
+      'coffee',
+      'lunch',
+      'meeting',
+      'training',
+      'feedback',
+      'backoffice',
+      'internal_support',
+      'technical_issue',
+      'rest',
+      'end_shift',
+    ]);
+    await reasons.setValue('coffee');
+    await wrapper.findAll('button')[1].trigger('click');
+    await flushPromises();
+    expect(JrcContactCenterAPI.updateAgentState).toHaveBeenLastCalledWith(
+      '1',
+      expect.objectContaining({ state: 'paused', reason_code: 'coffee' })
+    );
+    await wrapper.findAll('button')[0].trigger('click');
+    await flushPromises();
+    expect(JrcContactCenterAPI.updateAgentState).toHaveBeenLastCalledWith(
+      '1',
+      expect.objectContaining({
+        state: 'available',
+        expected_state_version: '1',
+      })
+    );
+    expect(wrapper.text()).toContain(
+      'JRC_CONTACT_CENTER.AGENT.STATES.available'
+    );
+  });
+
+  it('requires a structured selection when restoring a legacy free-text pause reason', async () => {
+    JrcContactCenterAPI.agentState.mockResolvedValueOnce({
+      data: {
+        item: {
+          ...initialState,
+          state: 'paused',
+          reason_code: 'legacy free text',
+        },
+      },
+    });
+    const wrapper = mount(AgentStatePanel, {
+      props: { accountId: '1', canOperate: true },
+    });
+    await flushPromises();
+    expect(wrapper.findAll('button')[1].attributes('disabled')).toBeDefined();
+    await wrapper
+      .get('select[aria-label="JRC_CONTACT_CENTER.AGENT.REASON"]')
+      .setValue('coffee');
+    expect(wrapper.findAll('button')[1].attributes('disabled')).toBeUndefined();
   });
 });
