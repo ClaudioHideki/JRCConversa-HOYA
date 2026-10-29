@@ -51,7 +51,9 @@ class JrcVoiceQuality::AudioAuditJob < ApplicationJob
   def transcribe(audit, client)
     audit.update!(transcription_model: client.transcription_model)
     transcript = audit.audio.blob.open do |file|
-      client.transcribe!(tempfile: file, filename: audit.filename, content_type: audit.audio.blob.content_type)
+      # Marcel identifies WhatsApp OGG voice notes as audio/opus.
+      content_type = audit.audio.blob.content_type == 'audio/opus' ? 'audio/ogg' : audit.audio.blob.content_type
+      client.transcribe!(tempfile: file, filename: audit.filename, content_type: content_type)
     end
     audit.update!(transcript: transcript)
     transcript

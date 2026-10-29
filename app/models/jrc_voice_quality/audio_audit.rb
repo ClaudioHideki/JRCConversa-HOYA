@@ -2,7 +2,10 @@ class JrcVoiceQuality::AudioAudit < ApplicationRecord
   self.table_name = 'jrc_voice_quality_audio_audits'
 
   MAX_AUDIO_BYTES = 25.megabytes
-  CONTENT_TYPES = %w[audio/mpeg audio/mp3 audio/wav audio/x-wav audio/wave audio/vnd.wave audio/ogg application/ogg audio/mp4 audio/x-m4a].freeze
+  CONTENT_TYPES = %w[
+    audio/mpeg audio/mp3 audio/wav audio/x-wav audio/wave audio/vnd.wave
+    audio/ogg audio/opus application/ogg audio/mp4 audio/x-m4a
+  ].freeze
   EXTENSIONS = %w[.mp3 .wav .ogg .m4a].freeze
 
   belongs_to :account
