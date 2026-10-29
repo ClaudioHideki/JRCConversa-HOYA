@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_10_16_123000) do
+ActiveRecord::Schema[7.1].define(version: 2026_10_29_180000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -4852,6 +4852,26 @@ ActiveRecord::Schema[7.1].define(version: 2026_10_16_123000) do
     t.check_constraint "btrim(code::text) <> ''::text AND btrim(name::text) <> ''::text", name: "jrc_sd_units_names"
   end
 
+  create_table "jrc_voice_quality_audio_audits", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "user_id"
+    t.string "filename", null: false
+    t.string "status", default: "queued", null: false
+    t.text "transcript"
+    t.jsonb "result", default: {}, null: false
+    t.string "analysis_model"
+    t.string "transcription_model"
+    t.string "error_code"
+    t.datetime "started_at"
+    t.datetime "completed_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "created_at"], name: "idx_voice_quality_audits_history"
+    t.index ["account_id"], name: "index_jrc_voice_quality_audio_audits_on_account_id"
+    t.index ["user_id"], name: "index_jrc_voice_quality_audio_audits_on_user_id"
+    t.check_constraint "status::text = ANY (ARRAY['queued'::character varying, 'processing'::character varying, 'completed'::character varying, 'failed'::character varying]::text[])", name: "voice_quality_audit_status"
+  end
+
   create_table "labels", force: :cascade do |t|
     t.string "title"
     t.text "description"
@@ -6079,6 +6099,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_10_16_123000) do
   add_foreign_key "jrc_service_desk_unit_memberships", "jrc_service_desk_units", column: ["account_id", "unit_id"], primary_key: ["account_id", "id"], name: "jrc_sd_unit_memberships_unit_fk"
   add_foreign_key "jrc_service_desk_units", "accounts", name: "jrc_sd_units_account_fk"
   add_foreign_key "jrc_service_desk_units", "jrc_service_desk_operator_companies", column: ["account_id", "operator_company_id"], primary_key: ["account_id", "id"], name: "jrc_sd_unit_operator_fk"
+  add_foreign_key "jrc_voice_quality_audio_audits", "accounts"
+  add_foreign_key "jrc_voice_quality_audio_audits", "users", on_delete: :nullify
   add_foreign_key "sales_activities", "accounts"
   add_foreign_key "sales_activities", "contacts"
   add_foreign_key "sales_activities", "sales_opportunities"
@@ -7011,6 +7033,14 @@ ActiveRecord::Schema[7.1].define(version: 2026_10_16_123000) do
   execute <<~'JRC_SCHEMA_SQL_6197efcc38e4'
     ALTER TABLE "jrc_service_desk_units" ADD CONSTRAINT "jrc_sd_units_names" CHECK (((btrim((code)::text) <> ''::text) AND (btrim((name)::text) <> ''::text)));
   JRC_SCHEMA_SQL_6197efcc38e4
+
+  execute <<~'JRC_SCHEMA_SQL_1820f906aa41'
+    ALTER TABLE "jrc_voice_quality_audio_audits" DROP CONSTRAINT "voice_quality_audit_status";
+  JRC_SCHEMA_SQL_1820f906aa41
+
+  execute <<~'JRC_SCHEMA_SQL_10fdd3d06733'
+    ALTER TABLE "jrc_voice_quality_audio_audits" ADD CONSTRAINT "voice_quality_audit_status" CHECK (((status)::text = ANY ((ARRAY['queued'::character varying, 'processing'::character varying, 'completed'::character varying, 'failed'::character varying])::text[])));
+  JRC_SCHEMA_SQL_10fdd3d06733
 
   execute <<~'JRC_SCHEMA_SQL_420a30ca76df'
     DROP INDEX "idx_captain_faq_observations_on_conversation_and_suggestion";

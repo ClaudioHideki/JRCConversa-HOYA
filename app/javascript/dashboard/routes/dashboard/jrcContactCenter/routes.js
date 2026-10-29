@@ -121,7 +121,7 @@ export const routes = [
       {
         path: 'gravacoes',
         name: 'jrc_contact_center_recordings',
-        ...visualPage('recordings'),
+        component: () => import('./views/RecordingsPage.vue'),
         meta: reportsMeta,
       },
       {

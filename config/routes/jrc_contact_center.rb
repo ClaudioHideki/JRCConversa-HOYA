@@ -7,6 +7,10 @@ namespace :api, defaults: { format: 'json' } do
         resource :agent_state, only: %i[show update], controller: 'agent_states'
         resource :acw_policy, only: %i[show update], controller: 'acw_policies'
         resources :qualifications, only: %i[index create update]
+        resources :audio_audits, only: %i[index show create] do
+          post :retry_analysis, on: :member
+          get :audio, on: :member
+        end
         get 'supervisor', to: 'supervisor#show'
         resources :commands, only: %i[index show create]
         resources :events, only: [:index] do
