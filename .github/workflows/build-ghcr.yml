@@ -112,6 +112,7 @@ jobs:
         run: |
           ruby test/jrc_customers/identity_pure_test.rb
           ruby test/jrc_customers/company_link_decision_test.rb
+          bundle exec ruby test/jrc_voice_quality/emotional_profile_test.rb
           bundle exec ruby -Itest -e 'Dir["test/jrc_relationship/*_test.rb", "test/jrc_operations/*_test.rb"].each { |file| require_relative file }'
           node --test test/jrc_customers/*.test.mjs test/jrc_operations/*test.mjs test/jrc_consolidation/commercial_ui.test.mjs
 

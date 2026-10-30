@@ -29,7 +29,7 @@ class JrcVoiceQuality::MonitoringClient < JrcVoiceQuality::OpenaiClient
 
   def normalize_analysis(analysis, transcript)
     JrcVoiceQuality::EmotionalProfile.invalid! unless [true, false].include?(analysis['avaliacao_atendente_aplicavel'])
-    JrcVoiceQuality::EmotionalProfile.validate!(analysis['perfil_emocional'], transcript: transcript)
+    analysis['perfil_emocional'] = JrcVoiceQuality::EmotionalProfile.normalize(analysis['perfil_emocional'], transcript: transcript)
     normalized = super
     if analysis['avaliacao_atendente_aplicavel'] == false
       normalized['nota_final'] = nil

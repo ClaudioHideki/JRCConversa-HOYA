@@ -36,9 +36,59 @@ class JrcVoiceQuality::EmotionalProfile
     profile
   end
 
-  def self.validate_citations!(citations, transcript)
+  def self.normalize(profile, transcript:)
+    invalid! unless JSONSchemer.schema(schema.deep_stringify_keys).valid?(profile)
+
+    normalized = profile.deep_dup
+    normalize_metrics!(normalized, transcript)
+    normalize_resolution!(normalized, transcript)
+    normalize_evolution!(normalized, transcript)
+    validate!(normalized, transcript: transcript)
+  end
+
+  def self.normalize_metrics!(profile, transcript)
+    %w[positivos negativos].each do |group|
+      profile.fetch(group).each do |name, metric|
+        next if metric_supported?(metric) && citations_supported?(metric['evidencias'], transcript)
+
+        reason = 'Não avaliado: a resposta da IA não apresentou evidências consistentes e verificáveis na transcrição.'
+        metric.replace('nota' => nil, 'confianca' => 'insuficiente', 'evidencias' => [], 'observacao' => reason)
+        profile['limitacoes'] << "#{group}.#{name}: #{reason}"
+      end
+    end
+  end
+
+  def self.normalize_resolution!(profile, transcript)
+    resolution = profile.fetch('resolucao')
+    supported = resolution['situacao'] == 'nao_identificado' || resolution['evidencias'].present?
+    return if supported && citations_supported?(resolution['evidencias'], transcript)
+
+    reason = 'Resolução não avaliada: faltam evidências consistentes e verificáveis na transcrição.'
+    resolution.replace('situacao' => 'nao_identificado', 'justificativa' => reason, 'evidencias' => [])
+    profile['limitacoes'] << reason
+  end
+
+  def self.normalize_evolution!(profile, transcript)
+    evolution = profile.fetch('evolucao')
+    phases = evolution.values_at('inicio', 'meio', 'fim')
+    supported = evolution['resultado'] == 'dados_insuficientes' ||
+                (phases.count { |phase| phase['evidencias'].present? } >= 2 &&
+                 phases.flat_map { |phase| phase['evidencias'] }.uniq.length >= 2)
+    return if supported && citations_supported?(phases.flat_map { |phase| phase['evidencias'] }, transcript)
+
+    reason = 'Evolução não avaliada: faltam dois momentos distintos com evidências verificáveis na transcrição.'
+    evolution.merge!('resultado' => 'dados_insuficientes', 'justificativa' => reason)
+    phases.each { |phase| phase.replace('observacao' => reason, 'evidencias' => []) }
+    profile['limitacoes'] << reason
+  end
+
+  def self.citations_supported?(citations, transcript)
     text = transcript.to_s.gsub(/\s+/, ' ').strip
-    invalid! unless citations.all? { |quote| quote.present? && text.include?(quote.gsub(/\s+/, ' ').strip) }
+    citations.all? { |quote| quote.present? && text.include?(quote.gsub(/\s+/, ' ').strip) }
+  end
+
+  def self.validate_citations!(citations, transcript)
+    invalid! unless citations_supported?(citations, transcript)
   end
 
   def self.context_citations(profile)
@@ -80,6 +130,8 @@ class JrcVoiceQuality::EmotionalProfile
       Nota 0 exige evidencia de ausencia daquele sentimento; falta de evidencia NAO e zero.
       Sem evidencia ou sem identificar o papel do cliente: nota null, confianca insuficiente, evidencias vazias e explique na observacao.
       Toda nota numerica exige evidencias copiadas literalmente da transcricao e confianca alta/media/baixa.
+      Nao parafraseie, complete ou corrija as citacoes; copie trechos exatos, sem acrescentar nomes de interlocutores ou reticencias.
+      Se nao conseguir citar um trecho exato para um indicador, retorne nota null, confianca insuficiente e evidencias [].
       Separe resolucao objetiva de sentimentos: agradecimento, humor positivo, promessa e encerramento nao comprovam solucao.
       Use nao_identificado quando nao houver fatos suficientes. Cite falas literais para qualquer outra situacao.
       Evolucao: inicio, meio e fim na ordem da transcricao, com evidencias literais; nao invente momentos ausentes.
