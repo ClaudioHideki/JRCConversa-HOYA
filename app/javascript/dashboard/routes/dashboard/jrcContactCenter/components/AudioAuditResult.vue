@@ -2,6 +2,8 @@
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
+import EmotionalProfile from './EmotionalProfile.vue';
+import ScoreBreakdown from './ScoreBreakdown.vue';
 
 const props = defineProps({ audit: { type: Object, required: true } });
 const emit = defineEmits(['download', 'play']);
@@ -136,6 +138,19 @@ const excerpt = value => {
           }}</span>
         </div>
         <div class="min-w-0 space-y-2 text-xs">
+          <p class="font-bold">
+            {{
+              result.pontuacao_geral
+                ? t('JRC_CONTACT_CENTER.RECORDINGS.GENERAL_SCORE.LABEL')
+                : t('JRC_CONTACT_CENTER.RECORDINGS.LEGACY_SCORE')
+            }}
+          </p>
+          <p
+            v-if="result.pontuacao_geral?.parcial"
+            class="font-semibold text-amber-700"
+          >
+            {{ t('JRC_CONTACT_CENTER.RECORDINGS.PARTIAL_SCORE') }}
+          </p>
           <p class="font-bold">{{ label(result.classificacao_ligacao) }}</p>
           <p>{{ label(result.status_monitoria) }}</p>
           <p
@@ -156,6 +171,11 @@ const excerpt = value => {
     <p class="mb-4 text-xs leading-relaxed text-n-slate-10">
       {{ t('JRC_CONTACT_CENTER.RECORDINGS.AI_NOTICE') }}
     </p>
+    <ScoreBreakdown
+      v-if="result.pontuacao_geral"
+      :score="result.pontuacao_geral"
+    />
+    <EmotionalProfile :result="result" />
     <div
       class="mb-4 flex gap-2 overflow-x-auto border-b border-n-weak pb-2"
       role="tablist"

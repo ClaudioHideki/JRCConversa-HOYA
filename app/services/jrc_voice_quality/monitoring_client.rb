@@ -3,7 +3,7 @@ class JrcVoiceQuality::MonitoringClient < JrcVoiceQuality::OpenaiClient
   private
 
   def system_prompt
-    super + <<~PROMPT
+    super + JrcVoiceQuality::EmotionalProfile.instructions + <<~PROMPT
 
       Para a monitoria enviada manualmente, descreva a sensacao geral da conversa,
       emita um parecer e justifique a nota com evidencias da transcricao.
@@ -21,6 +21,25 @@ class JrcVoiceQuality::MonitoringClient < JrcVoiceQuality::OpenaiClient
     end
     schema[:properties][:trechos_relevantes] = { type: 'array', items: { type: 'string' } }
     schema[:required] << 'trechos_relevantes'
+    schema[:properties][:perfil_emocional] = JrcVoiceQuality::EmotionalProfile.schema
+    schema[:properties][:avaliacao_atendente_aplicavel] = { type: 'boolean' }
+    schema[:required] += %w[perfil_emocional avaliacao_atendente_aplicavel]
     schema
+  end
+
+  def normalize_analysis(analysis, transcript)
+    JrcVoiceQuality::EmotionalProfile.invalid! unless [true, false].include?(analysis['avaliacao_atendente_aplicavel'])
+    JrcVoiceQuality::EmotionalProfile.validate!(analysis['perfil_emocional'], transcript: transcript)
+    normalized = super
+    if analysis['avaliacao_atendente_aplicavel'] == false
+      normalized['nota_final'] = nil
+      normalized['avaliacao_atendente'] = normalized['avaliacao_atendente'].transform_values { nil }
+      normalized['classificacao_ligacao'] = 'nao_avaliada'
+      normalized['status_monitoria'] = 'nao_avaliada'
+    else
+      normalized['classificacao_ligacao'] = classification_from_score(normalized['nota_final'])
+      normalized['status_monitoria'] = normalized['alerta_supervisao'] ? 'critica_para_supervisao' : status_from_score(normalized['nota_final'])
+    end
+    normalized
   end
 end

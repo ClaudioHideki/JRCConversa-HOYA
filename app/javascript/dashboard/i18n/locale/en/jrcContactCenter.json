@@ -1573,20 +1573,20 @@
     "RECORDINGS": {
       "SUBTITLE": "Monitoria de qualidade por IA · gravações enviadas nesta conta",
       "TOTAL": "Total auditado",
-      "AVERAGE": "Nota média",
+      "AVERAGE": "Nota geral média",
       "ALERTS": "Alertas",
       "CRITICAL": "Chamadas críticas",
       "HOT": "Conversas quentes",
       "CHURN": "Risco de churn",
-      "UPLOAD_TITLE": "Selecionar gravação do atendimento",
-      "UPLOAD_DESCRIPTION": "Envie um áudio para avaliar a conversa, os sentimentos do cliente e do atendente, o desempenho e os pontos de melhoria.",
-      "DROP": "Arraste o áudio para cá ou selecione um arquivo.",
-      "CHOOSE": "Selecionar gravação",
-      "FORMATS": "MP3, WAV, OGG ou M4A. Limite: 25 MB por arquivo.",
-      "PROVIDER_NOTICE": "O áudio será enviado ao provedor de IA configurado para esta conta. Envie apenas gravações que você está autorizado a analisar.",
-      "CONFIGURATION_REQUIRED": "Configure um provedor de IA com chave e modelos compatíveis com transcrição e análise em Configurações → Inteligência Artificial → Provedores. A configuração é a mesma usada na análise do PABX.",
+      "UPLOAD_TITLE": "Selecionar gravações do atendimento",
+      "UPLOAD_DESCRIPTION": "Selecione um ou vários áudios. Cada gravação terá sua própria análise, nota e resultado no histórico.",
+      "DROP": "Arraste os áudios para cá ou selecione os arquivos.",
+      "CHOOSE": "Selecionar gravações",
+      "FORMATS": "MP3, WAV, OGG ou M4A. Vários arquivos, com até 25 MB por arquivo.",
+      "PROVIDER_NOTICE": "O áudio será enviado ao provedor de IA desta conta para transcrição e também para avaliação vocal. Essa avaliação utiliza um modelo de áudio e gera consumo adicional. Envie apenas gravações que você está autorizado a analisar.",
+      "CONFIGURATION_REQUIRED": "Configure um provedor de IA com chave e modelos compatíveis com transcrição, análise textual e entrada de áudio em Configurações → Inteligência Artificial → Provedores.",
       "ANALYZE": "Analisar gravação",
-      "UPLOADING": "Enviando gravação…",
+      "UPLOADING": "Enviando gravações…",
       "HISTORY": "Histórico de monitorias",
       "REFRESH": "Atualizar histórico",
       "DATE": "Data",
@@ -1629,7 +1629,7 @@
       "TRAINING": "Treinamento recomendado",
       "EXCERPTS": "Trechos relevantes",
       "NOT_IDENTIFIED": "Nenhum ponto identificado.",
-      "AI_NOTICE": "Avaliação gerada por IA a partir da transcrição. Sentimentos, tons e riscos são estimativas e devem ser revisados pela supervisão; não representam certeza nem diagnóstico.",
+      "AI_NOTICE": "Avaliação estimada por IA a partir da transcrição e do áudio. Revise as evidências e a confiança de cada indicador. As notas não representam certeza nem diagnóstico.",
       "ERRORS": {
         "invalid_audio": "Selecione um áudio MP3, WAV, OGG ou M4A válido, com até 25 MB.",
         "openai_not_configured": "Configure a chave e os modelos do provedor de IA desta conta antes de analisar.",
@@ -1637,7 +1637,11 @@
         "analysis_failed": "A análise não foi concluída pelo provedor. Verifique o modelo e a cota antes de tentar novamente.",
         "processing_failed": "Não foi possível processar o áudio. Verifique o armazenamento e o provedor e tente novamente.",
         "access_revoked": "A permissão de monitoria foi removida. Solicite acesso ao administrador.",
-        "analysis_not_failed": "Esta gravação já está em processamento ou foi concluída."
+        "analysis_not_failed": "Esta gravação já está em processamento ou foi concluída.",
+        "vocal_analysis_failed": "A avaliação vocal não foi concluída. Verifique se o modelo de áudio está disponível para a chave desta conta e se há cota. A transcrição e a análise textual já concluídas foram preservadas.",
+        "vocal_audio_limit": "O áudio convertido excede o limite de 25 MB da avaliação vocal. Envie uma gravação menor.",
+        "vocal_audio_invalid": "Não foi possível preparar o áudio para a avaliação vocal. Verifique se a gravação é válida.",
+        "vocal_converter_missing": "O conversor de áudio está indisponível no worker. Solicite ao administrador a atualização da imagem."
       },
       "VALUES": {
         "queued": "Na fila",
@@ -1668,7 +1672,8 @@
         "media": "Média",
         "baixa": "Baixa",
         "true": "Sim",
-        "false": "Não"
+        "false": "Não",
+        "nao_avaliada": "Não avaliada"
       },
       "SCORES": {
         "cordialidade": "Cordialidade / 10",
@@ -1697,7 +1702,112 @@
       "ALERT_VALUE": "Alerta de supervisão: {value}",
       "CONTEXT": "Contexto e sensação geral",
       "OPINION": "Parecer da monitoria",
-      "SCORE_REASON": "Justificativa da nota"
+      "SCORE_REASON": "Justificativa da nota",
+      "EMOTIONS": {
+        "TITLE": "Como o cliente se sentiu",
+        "DESCRIPTION": "Indicadores independentes de 0 a 10. Sentimentos positivos e negativos podem coexistir. Sem evidência suficiente, o indicador fica não avaliado.",
+        "POSITIVE": "Sentimentos positivos",
+        "NEGATIVE": "Sentimentos negativos",
+        "NOT_EVALUATED": "Não avaliado · evidência insuficiente",
+        "CONFIDENCE": "Confiança: ",
+        "EVIDENCE": "Ver evidências",
+        "TEXT_SOURCE": "Fonte: transcrição",
+        "AUDIO_SOURCE": "Fonte: áudio · expressão vocal estimada",
+        "VOCAL_NOTICE": "Sorriso na voz é uma estimativa da expressão vocal audível do cliente; não comprova um sorriso físico. ",
+        "MODEL": "Modelo de áudio: {model}. ",
+        "RESOLUTION": "Situação objetiva da resolução",
+        "EVOLUTION": "Evolução emocional durante o atendimento",
+        "LIMITATIONS": "Limitações da avaliação",
+        "LEGACY": "Esta monitoria usa o formato anterior. O detalhamento emocional e vocal será gerado nas novas análises; as notas antigas foram preservadas.",
+        "METRICS": {
+          "satisfacao": "Satisfação",
+          "confianca": "Confiança",
+          "encantamento": "Encantamento",
+          "alivio": "Alívio",
+          "compreensao": "Compreensão",
+          "sorriso_na_voz": "Sorriso na voz",
+          "frustracao": "Frustração",
+          "decepcao": "Decepção",
+          "ansiedade": "Ansiedade",
+          "agressividade": "Agressividade",
+          "inseguranca": "Insegurança"
+        },
+        "CONFIDENCES": {
+          "alta": "Alta",
+          "media": "Média",
+          "baixa": "Baixa",
+          "insuficiente": "Insuficiente"
+        },
+        "RESOLUTIONS": {
+          "resolvido": "Resolvido",
+          "parcialmente_resolvido": "Parcialmente resolvido",
+          "encaminhado": "Encaminhado",
+          "nao_resolvido": "Não resolvido",
+          "nao_identificado": "Não identificado"
+        },
+        "CHANGES": {
+          "melhorou": "Melhorou",
+          "piorou": "Piorou",
+          "estavel": "Estável",
+          "mista": "Mista",
+          "dados_insuficientes": "Dados insuficientes"
+        },
+        "PHASES": {
+          "inicio": "Início",
+          "meio": "Meio",
+          "fim": "Fim"
+        },
+        "OUT_OF_10": "/10"
+      },
+      "AUDIO_MODEL_LABEL": "Modelo de áudio para Sorriso na voz",
+      "AUDIO_MODEL_HELP": "Exige entrada de áudio em Chat Completions. Padrão: gpt-audio. Usa a chave deste provedor e gera consumo adicional por gravação; o modelo padrão de texto continua sendo usado para os demais indicadores.",
+      "AVERAGE_NOTICE": "A média considera somente notas gerais completas. Resultados parciais e notas do formato anterior permanecem no histórico, fora dessa média.",
+      "LEGACY_SCORE": "Nota do formato anterior",
+      "PARTIAL_SCORE": "Resultado parcial",
+      "ANALYZE_BATCH": "Analisar gravações ({count})",
+      "BATCH_COUNT": "{total} arquivo(s) selecionado(s) · {sent} enviado(s) para análise",
+      "REMOVE_SELECTION": "Remover da seleção",
+      "RETRY_UPLOAD": "Preparar nova tentativa de envio",
+      "BATCH_STATES": {
+        "ready": "Pronto para enviar",
+        "uploading": "Enviando…",
+        "sent": "Enviado para análise · acompanhe o resultado no histórico",
+        "upload_failed": "Falha no envio · confira o histórico antes de tentar novamente",
+        "invalid": "Arquivo inválido · os outros arquivos válidos podem ser enviados"
+      },
+      "GENERAL_SCORE": {
+        "LABEL": "Nota geral do atendimento",
+        "TITLE": "Por que o atendimento recebeu esta nota?",
+        "DESCRIPTION": "Uma única nota reúne qualidade, sentimentos, resolução e evolução. A comparação abaixo mostra os pontos obtidos e os pontos não obtidos em relação ao máximo de cada indicador.",
+        "CONTRIBUTED": "O que mais contribuiu para a nota",
+        "REDUCED": "O que mais reduziu a nota",
+        "EARNED_NOTICE": "Maiores contribuições em pontos ponderados.",
+        "LOST_NOTICE": "Maiores diferenças para a pontuação máxima. Indicadores não avaliados não entram nesta lista.",
+        "POINTS_UNIT": "pontos",
+        "EVIDENCE": "Ver evidências",
+        "NO_REASON": "Consulte os critérios operacionais e a transcrição para revisão da nota.",
+        "NO_HIGHLIGHTS": "Nenhum destaque avaliável nesta gravação.",
+        "CALCULATION": "Ver cálculo completo: notas, pesos e pontos",
+        "FORMULA": "Cada nota é convertida para seu peso na composição. Nos sentimentos negativos, a escala é invertida: intensidade 0 recebe a pontuação máxima; intensidade 10 recebe zero. Quando faltar evidência, o indicador é excluído e a nota é proporcional ao peso avaliado: pontos obtidos ÷ peso avaliado × 100.",
+        "INDICATOR": "Indicador e justificativa",
+        "RATING": "Nota / escala",
+        "WEIGHT": "Peso previsto",
+        "EARNED": "Pontos obtidos",
+        "PERCENT": "%",
+        "NOT_EVALUATED": "Não avaliado",
+        "PARTIAL": "Resultado parcial: {points} pontos obtidos em {weight} pontos avaliáveis. Nota proporcional: {score}/100. Indicadores sem evidência foram excluídos; este resultado não entra na média das notas completas.",
+        "NO_SCORE": "Não há evidência suficiente para calcular a nota geral. Os indicadores permanecem não avaliados.",
+        "SCORING_RULES": "Composição: qualidade 60%; seis positivos 15% (2,5% cada); cinco negativos 10% (2% cada); resolução 10%; evolução 5%. Resolução: resolvido 10, parcial 6, encaminhado 4, não resolvido 0. Evolução: melhorou 10, estável ou mista 5, piorou 0. Sem evidência: não avaliado. A nota geral descreve a experiência completa e não é exclusivamente uma avaliação individual do atendente.",
+        "GROUPS": {
+          "qualidade": "Qualidade do atendimento",
+          "positivos": "Sentimentos positivos",
+          "negativos": "Sentimentos negativos (invertidos)",
+          "resolucao": "Resolução objetiva",
+          "evolucao": "Evolução emocional"
+        },
+        "GROUP_WEIGHT": "{name} · {weight}%",
+        "GROUP_POINTS": "{points} / {weight} pontos"
+      }
     }
   }
 }

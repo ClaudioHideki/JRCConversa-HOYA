@@ -36,6 +36,8 @@ const emptyForm = () => ({
   default_model: '',
   fast_model: '',
   advanced_model: '',
+  quality_audio_model: 'gpt-audio',
+  settings: {},
   monthly_token_limit: '',
   monthly_budget_brl: '',
   active: true,
@@ -128,6 +130,8 @@ const startEdit = provider => {
     default_model: provider.default_model || '',
     fast_model: provider.fast_model || '',
     advanced_model: provider.advanced_model || '',
+    quality_audio_model: provider.settings?.quality_audio_model || 'gpt-audio',
+    settings: { ...provider.settings },
     monthly_token_limit: provider.monthly_token_limit || '',
     monthly_budget_brl: provider.monthly_budget_cents
       ? provider.monthly_budget_cents / 100
@@ -150,6 +154,10 @@ const buildPayload = () => ({
   default_model: form.value.default_model.trim(),
   fast_model: form.value.fast_model.trim(),
   advanced_model: form.value.advanced_model.trim(),
+  settings: {
+    ...form.value.settings,
+    quality_audio_model: form.value.quality_audio_model.trim(),
+  },
   monthly_token_limit:
     form.value.monthly_token_limit === ''
       ? null
@@ -812,6 +820,17 @@ onMounted(load);
                 class="mt-1 h-11 w-full rounded-xl border border-n-weak bg-n-solid-2 text-n-slate-12 px-3 outline-none focus:border-blue-500"
                 placeholder="Ex.: 500,00"
             /></label>
+            <label class="text-sm font-medium text-n-slate-12 md:col-span-2">
+              {{ t('JRC_CONTACT_CENTER.RECORDINGS.AUDIO_MODEL_LABEL') }}
+              <input
+                v-model="form.quality_audio_model"
+                class="mt-1 h-11 w-full rounded-xl border border-n-weak bg-n-solid-2 px-3 text-n-slate-12 outline-none focus:border-blue-500"
+                placeholder="gpt-audio"
+              />
+              <span class="mt-1 block text-xs font-normal text-n-slate-10">{{
+                t('JRC_CONTACT_CENTER.RECORDINGS.AUDIO_MODEL_HELP')
+              }}</span>
+            </label>
             <div class="flex flex-wrap items-center gap-5 md:col-span-2">
               <label class="flex items-center gap-2 text-sm text-n-slate-12"
                 ><input

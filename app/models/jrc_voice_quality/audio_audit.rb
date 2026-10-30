@@ -24,7 +24,8 @@ class JrcVoiceQuality::AudioAudit < ApplicationRecord
       created_at: created_at, completed_at: completed_at, error_code: error_code,
       nota_final: result['nota_final'], temperatura_conversa: result['temperatura_conversa'],
       sentimento_cliente: result['sentimento_cliente'], classificacao_ligacao: result['classificacao_ligacao'],
-      status_monitoria: result['status_monitoria'], alerta_supervisao: result['alerta_supervisao']
+      status_monitoria: result['status_monitoria'], alerta_supervisao: result['alerta_supervisao'],
+      score_version: result.dig('pontuacao_geral', 'versao'), score_partial: result.dig('pontuacao_geral', 'parcial')
     }
   end
 
@@ -35,9 +36,10 @@ class JrcVoiceQuality::AudioAudit < ApplicationRecord
   def self.metrics
     done = completed
     total = done.count
+    scored = done.where("result->'pontuacao_geral'->>'versao' = '1' AND result->'pontuacao_geral'->>'parcial' = 'false'")
     {
       total: total,
-      average_score: done.average(Arel.sql("(result->>'nota_final')::numeric"))&.round(2)&.to_f,
+      average_score: scored.average(Arel.sql("(result->>'nota_final')::numeric"))&.round(2)&.to_f,
       alerts: done.where("result->>'alerta_supervisao' = 'true'").count,
       critical: done.where("result->>'classificacao_ligacao' = 'critica'").count,
       hot: done.where("result->>'temperatura_conversa' IN ('quente', 'critica')").count,

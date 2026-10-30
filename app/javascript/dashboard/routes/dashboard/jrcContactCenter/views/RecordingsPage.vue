@@ -16,7 +16,14 @@ const page = ref(1);
 const loading = ref(false);
 const uploading = ref(false);
 const error = ref('');
-const selectedFile = ref(null);
+const batch = ref([]);
+let nextFileId = 0;
+const readyFiles = computed(() =>
+  batch.value.filter(item => item.status === 'ready')
+);
+const sentCount = computed(
+  () => batch.value.filter(item => item.status === 'sent').length
+);
 const selected = ref(null);
 const opening = ref(false);
 const fileInput = ref(null);
@@ -67,10 +74,13 @@ const clearAudio = () => {
   if (audioUrl.value) URL.revokeObjectURL(audioUrl.value);
   audioUrl.value = '';
 };
-const setError = exception => {
+const errorMessage = exception => {
   const code = exception?.response?.data?.error;
   const messages = tm('JRC_CONTACT_CENTER.RECORDINGS.ERRORS');
-  error.value = messages[code] || t('JRC_CONTACT_CENTER.RECORDINGS.ERROR');
+  return messages[code] || t('JRC_CONTACT_CENTER.RECORDINGS.ERROR');
+};
+const setError = exception => {
+  error.value = errorMessage(exception);
 };
 const openAudit = async id => {
   const current = generation;
@@ -118,36 +128,66 @@ const refresh = async () => {
     if (current === generation) loading.value = false;
   }
 };
-const chooseFile = file => {
+const chooseFiles = files => {
+  if (uploading.value) return;
   error.value = '';
-  selectedFile.value = null;
-  if (!file) return;
-  if (
-    !/\.(mp3|wav|ogg|m4a)$/i.test(file.name) ||
-    file.size === 0 ||
-    file.size > (configuration.value?.max_audio_bytes || 25 * 1024 * 1024)
-  ) {
-    error.value = t('JRC_CONTACT_CENTER.RECORDINGS.ERRORS.invalid_audio');
-    if (fileInput.value) fileInput.value.value = '';
-    return;
-  }
-  selectedFile.value = file;
+  Array.from(files || []).forEach(file => {
+    nextFileId += 1;
+    const valid =
+      /\.(mp3|wav|ogg|m4a)$/i.test(file.name) &&
+      file.size > 0 &&
+      file.size <= (configuration.value?.max_audio_bytes || 25 * 1024 * 1024);
+    batch.value.push({
+      key: nextFileId,
+      file,
+      status: valid ? 'ready' : 'invalid',
+      error: valid
+        ? ''
+        : t('JRC_CONTACT_CENTER.RECORDINGS.ERRORS.invalid_audio'),
+    });
+  });
+  if (fileInput.value) fileInput.value.value = '';
+};
+const removeFile = key => {
+  if (!uploading.value)
+    batch.value = batch.value.filter(item => item.key !== key);
 };
 const upload = async () => {
-  if (!selectedFile.value || uploading.value) return;
+  if (
+    !readyFiles.value.length ||
+    uploading.value ||
+    !configuration.value?.configured
+  )
+    return;
   const current = generation;
+  const selectionAtStart = selecting;
+  const pending = [...readyFiles.value];
+  let lastId;
   uploading.value = true;
   error.value = '';
   try {
-    const { data } = await AudioAuditsAPI.upload(selectedFile.value);
+    for (let index = 0; index < pending.length; index += 1) {
+      const entry = pending[index];
+      if (current !== generation) break;
+      entry.status = 'uploading';
+      try {
+        // eslint-disable-next-line no-await-in-loop -- Send one file at a time to bound upload traffic and stop on Account changes.
+        const { data } = await AudioAuditsAPI.upload(entry.file);
+        if (current !== generation) return;
+        entry.status = 'sent';
+        entry.id = data.item.id;
+        lastId = data.item.id;
+      } catch (exception) {
+        if (current !== generation) return;
+        entry.status = 'upload_failed';
+        entry.error = errorMessage(exception);
+        if ([401, 403].includes(exception?.response?.status)) break;
+      }
+    }
     if (current !== generation) return;
-    selectedFile.value = null;
-    if (fileInput.value) fileInput.value.value = '';
     page.value = 1;
-    await openAudit(data.item.id);
     await refresh();
-  } catch (exception) {
-    if (current === generation) setError(exception);
+    if (lastId && selectionAtStart === selecting) await openAudit(lastId);
   } finally {
     if (current === generation) uploading.value = false;
   }
@@ -207,7 +247,7 @@ watch(
     metrics.value = {};
     configuration.value = null;
     selected.value = null;
-    selectedFile.value = null;
+    batch.value = [];
     error.value = '';
     total.value = 0;
     page.value = 1;
@@ -268,6 +308,9 @@ onUnmounted(() => {
         <p class="mt-4 text-3xl font-bold tabular-nums">{{ value }}</p>
       </div>
     </div>
+    <p class="text-xs leading-relaxed text-n-slate-10">
+      {{ t('JRC_CONTACT_CENTER.RECORDINGS.AVERAGE_NOTICE') }}
+    </p>
     <div
       class="grid min-w-0 gap-5 2xl:grid-cols-[minmax(260px,1fr)_minmax(0,2fr)]"
     >
@@ -283,7 +326,7 @@ onUnmounted(() => {
         <div
           class="rounded-xl border-2 border-dashed border-n-blue-5 bg-n-blue-1 p-5 text-center"
           @dragover.prevent
-          @drop.prevent="chooseFile($event.dataTransfer.files[0])"
+          @drop.prevent="chooseFiles($event.dataTransfer.files)"
         >
           <Icon
             icon="i-lucide-cloud-upload"
@@ -295,38 +338,97 @@ onUnmounted(() => {
           <input
             ref="fileInput"
             type="file"
+            multiple
+            :disabled="uploading"
             accept=".mp3,.wav,.ogg,.m4a"
             class="sr-only"
             :aria-label="t('JRC_CONTACT_CENTER.RECORDINGS.CHOOSE')"
-            @change="chooseFile($event.target.files[0])"
+            @change="chooseFiles($event.target.files)"
           />
           <button
             type="button"
             class="rounded-full bg-n-blue-9 px-5 py-3 text-xs font-bold text-white hover:bg-n-blue-10"
+            :disabled="uploading"
             @click="fileInput.click()"
           >
             {{ t('JRC_CONTACT_CENTER.RECORDINGS.CHOOSE') }}
           </button>
-          <p v-if="selectedFile" class="mt-4 break-all text-sm font-medium">
-            {{ selectedFile.name }}
+          <p v-if="batch.length" class="mt-4 text-sm font-medium" role="status">
+            {{
+              t('JRC_CONTACT_CENTER.RECORDINGS.BATCH_COUNT', {
+                total: batch.length,
+                sent: sentCount,
+              })
+            }}
           </p>
           <p class="mt-4 text-xs leading-relaxed text-n-slate-10">
             {{ t('JRC_CONTACT_CENTER.RECORDINGS.FORMATS') }}
           </p>
         </div>
+        <ul
+          v-if="batch.length"
+          class="mt-4 max-h-72 space-y-2 overflow-y-auto text-sm"
+          data-testid="audio-upload-batch"
+        >
+          <li
+            v-for="entry in batch"
+            :key="entry.key"
+            class="rounded-lg border border-n-weak p-3"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <p class="min-w-0 break-all font-medium">{{ entry.file.name }}</p>
+              <button
+                type="button"
+                :disabled="uploading"
+                class="shrink-0 text-n-blue-11 underline disabled:opacity-40"
+                @click="removeFile(entry.key)"
+              >
+                {{ t('JRC_CONTACT_CENTER.RECORDINGS.REMOVE_SELECTION') }}
+              </button>
+            </div>
+            <p
+              class="mt-1 text-xs"
+              :class="entry.error ? 'text-red-600' : 'text-n-slate-10'"
+              role="status"
+            >
+              {{
+                tm('JRC_CONTACT_CENTER.RECORDINGS.BATCH_STATES')[entry.status]
+              }}
+            </p>
+            <p v-if="entry.error" class="mt-1 text-xs text-red-600">
+              {{ entry.error }}
+            </p>
+            <button
+              v-if="entry.status === 'upload_failed'"
+              type="button"
+              :disabled="uploading"
+              class="mt-2 text-xs text-n-blue-11 underline"
+              @click="
+                entry.status = 'ready';
+                entry.error = '';
+              "
+            >
+              {{ t('JRC_CONTACT_CENTER.RECORDINGS.RETRY_UPLOAD') }}
+            </button>
+          </li>
+        </ul>
         <p class="my-4 text-xs leading-relaxed text-n-slate-10">
           {{ t('JRC_CONTACT_CENTER.RECORDINGS.PROVIDER_NOTICE') }}
         </p>
         <button
           type="button"
-          :disabled="!selectedFile || !configuration?.configured || uploading"
+          :disabled="
+            !readyFiles.length || !configuration?.configured || uploading
+          "
           class="flex w-full items-center justify-center gap-2 rounded-full bg-n-blue-9 px-5 py-3 text-sm font-bold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
           @click="upload"
         >
           <Icon icon="i-lucide-audio-lines" class="size-4" />{{
             uploading
               ? t('JRC_CONTACT_CENTER.RECORDINGS.UPLOADING')
-              : t('JRC_CONTACT_CENTER.RECORDINGS.ANALYZE')
+              : t('JRC_CONTACT_CENTER.RECORDINGS.ANALYZE_BATCH', {
+                  count: readyFiles.length,
+                })
           }}
         </button>
       </section>
@@ -396,7 +498,21 @@ onUnmounted(() => {
                 </td>
                 <td class="p-3">{{ label(item.temperatura_conversa) }}</td>
                 <td class="p-3">{{ label(item.sentimento_cliente) }}</td>
-                <td class="p-3 font-bold">{{ item.nota_final ?? '—' }}</td>
+                <td class="p-3 font-bold">
+                  {{ item.nota_final ?? '—' }}
+                  <p
+                    v-if="item.status === 'completed' && !item.score_version"
+                    class="mt-1 text-[10px] font-normal text-n-slate-10"
+                  >
+                    {{ t('JRC_CONTACT_CENTER.RECORDINGS.LEGACY_SCORE') }}
+                  </p>
+                  <p
+                    v-else-if="item.score_partial"
+                    class="mt-1 text-[10px] font-normal text-n-slate-10"
+                  >
+                    {{ t('JRC_CONTACT_CENTER.RECORDINGS.PARTIAL_SCORE') }}
+                  </p>
+                </td>
                 <td class="p-3">{{ label(item.classificacao_ligacao) }}</td>
                 <td class="p-3">
                   <p
