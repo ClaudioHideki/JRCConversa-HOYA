@@ -20,7 +20,11 @@ const number = value =>
 const items = computed(() =>
   props.score.grupos.flatMap(group => group.indicadores)
 );
-const title = item => metrics.value[item.id] || labels.value.GROUPS[item.grupo];
+const title = item => {
+  const name =
+    metrics.value[item.indicador || item.id] || labels.value.GROUPS[item.grupo];
+  return item.papel ? `${labels.value.ROLES[item.papel]} · ${name}` : name;
+};
 const highlights = computed(() =>
   [
     {
@@ -47,6 +51,12 @@ const highlights = computed(() =>
     <h3 class="font-bold text-n-slate-12">{{ tr('TITLE') }}</h3>
     <p class="text-sm leading-relaxed text-n-slate-10">
       {{ tr('DESCRIPTION') }}
+    </p>
+    <p
+      v-if="score.versao === 2"
+      class="rounded-xl bg-n-blue-2 p-4 text-sm leading-relaxed text-n-blue-11"
+    >
+      {{ tr('SERVICE_FOCUS') }}
     </p>
     <p
       v-if="score.peso_avaliado === 0"
@@ -192,7 +202,7 @@ const highlights = computed(() =>
         </table>
       </div>
       <p class="mt-4 text-xs leading-relaxed text-n-slate-10">
-        {{ tr('SCORING_RULES') }}
+        {{ tr(score.versao === 2 ? 'SERVICE_SCORING_RULES' : 'SCORING_RULES') }}
       </p>
     </details>
   </section>

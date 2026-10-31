@@ -3,7 +3,7 @@ class JrcVoiceQuality::MonitoringClient < JrcVoiceQuality::OpenaiClient
   private
 
   def system_prompt
-    super + JrcVoiceQuality::EmotionalProfile.instructions + <<~PROMPT
+    super + JrcVoiceQuality::ServiceEmotionalProfile.instructions + <<~PROMPT
 
       Para a monitoria enviada manualmente, descreva a sensacao geral da conversa,
       emita um parecer e justifique a nota com evidencias da transcricao.
@@ -21,7 +21,7 @@ class JrcVoiceQuality::MonitoringClient < JrcVoiceQuality::OpenaiClient
     end
     schema[:properties][:trechos_relevantes] = { type: 'array', items: { type: 'string' } }
     schema[:required] << 'trechos_relevantes'
-    schema[:properties][:perfil_emocional] = JrcVoiceQuality::EmotionalProfile.schema
+    schema[:properties][:perfil_emocional] = JrcVoiceQuality::ServiceEmotionalProfile.schema
     schema[:properties][:avaliacao_atendente_aplicavel] = { type: 'boolean' }
     schema[:required] += %w[perfil_emocional avaliacao_atendente_aplicavel]
     schema
@@ -29,7 +29,8 @@ class JrcVoiceQuality::MonitoringClient < JrcVoiceQuality::OpenaiClient
 
   def normalize_analysis(analysis, transcript)
     JrcVoiceQuality::EmotionalProfile.invalid! unless [true, false].include?(analysis['avaliacao_atendente_aplicavel'])
-    analysis['perfil_emocional'] = JrcVoiceQuality::EmotionalProfile.normalize(analysis['perfil_emocional'], transcript: transcript)
+    analysis['perfil_emocional'] = JrcVoiceQuality::ServiceEmotionalProfile.normalize(analysis['perfil_emocional'], transcript: transcript)
+    analysis['avaliacao_atendente_aplicavel'] &&= analysis['perfil_emocional'].dig('atendente', 'identificado')
     normalized = super
     if analysis['avaliacao_atendente_aplicavel'] == false
       normalized['nota_final'] = nil

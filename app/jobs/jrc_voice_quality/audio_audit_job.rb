@@ -44,15 +44,16 @@ class JrcVoiceQuality::AudioAuditJob < ApplicationJob
 
     transcript = audit.transcript.presence || transcribe(audit, client)
     result = text_analysis(audit, client, transcript)
-    result['analise_vocal'] = vocal_analysis(audit) unless result['analise_vocal']
+    result['analise_vocal'] = vocal_analysis(audit) unless result.dig('analise_vocal', 'versao') == 2
     result = JrcVoiceQuality::OverallScore.apply(result)
     audit.update!(status: 'completed', result: result, completed_at: Time.current)
   end
 
   def text_analysis(audit, client, transcript)
     cached = audit.result
-    if cached.dig('perfil_emocional', 'versao') == 2 && audit.analysis_model == client.analysis_model
-      JrcVoiceQuality::EmotionalProfile.validate!(cached['perfil_emocional'], transcript: transcript)
+    if cached.dig('perfil_emocional', 'versao') == JrcVoiceQuality::ServiceEmotionalProfile::VERSION &&
+       audit.analysis_model == client.analysis_model
+      JrcVoiceQuality::ServiceEmotionalProfile.validate!(cached['perfil_emocional'], transcript: transcript)
       return cached
     end
 

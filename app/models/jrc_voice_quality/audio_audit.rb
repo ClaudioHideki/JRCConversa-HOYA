@@ -36,7 +36,7 @@ class JrcVoiceQuality::AudioAudit < ApplicationRecord
   def self.metrics
     done = completed
     total = done.count
-    scored = done.where("result->'pontuacao_geral'->>'versao' = '1' AND result->'pontuacao_geral'->>'parcial' = 'false'")
+    scored = done.where("result->'pontuacao_geral'->>'versao' = '2' AND result->'pontuacao_geral'->>'parcial' = 'false'")
     {
       total: total,
       average_score: scored.average(Arel.sql("(result->>'nota_final')::numeric"))&.round(2)&.to_f,

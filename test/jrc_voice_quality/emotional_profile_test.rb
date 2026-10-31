@@ -4,6 +4,7 @@ require 'json_schemer'
 require 'faraday'
 require_relative '../../app/services/jrc_voice_quality'
 require_relative '../../app/services/jrc_voice_quality/emotional_profile'
+require_relative '../../app/services/jrc_voice_quality/service_emotional_profile'
 require_relative '../../app/services/jrc_voice_quality/local_analyzer'
 require_relative '../../app/services/jrc_voice_quality/openai_client'
 require_relative '../../app/services/jrc_voice_quality/monitoring_client'
@@ -155,13 +156,11 @@ class EmotionalProfileTest < Minitest::Test
     refute_includes score['mais_reduziram'], 'satisfacao'
   end
 
-  def test_only_recording_monitoring_client_normalizes_emotional_evidence
-    @profile['positivos']['satisfacao']['evidencias'] = ['Inventada.']
-    analysis = { 'perfil_emocional' => @profile.deep_dup, 'avaliacao_atendente_aplicavel' => true, 'avaliacao_atendente' => {} }
-    result = JrcVoiceQuality::MonitoringClient.new(account: nil).send(:normalize_analysis, analysis, @transcript)
-    assert_nil result.dig('perfil_emocional', 'positivos', 'satisfacao', 'nota')
-    assert_equal 8, result.dig('perfil_emocional', 'positivos', 'confianca', 'nota')
-    assert_equal @transcript, result['texto_transcrito']
+  def test_legacy_emotional_profile_stays_in_the_original_format_and_pabx_contract_is_preserved
+    result = Profile.normalize(@profile, transcript: @transcript)
+    assert_equal 2, result['versao']
+    assert_equal @profile, result
+    refute result.key?('atendente')
     refute JrcVoiceQuality::OpenaiClient.new(account: nil).send(:analysis_schema)[:properties].key?(:perfil_emocional)
   end
 end

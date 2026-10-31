@@ -12,14 +12,15 @@ class JrcVoiceQuality::OverallScore
     groups = build_groups
     items = groups.flat_map { |group| group['indicadores'] }
     evaluated = items.reject { |item| item['nota'].nil? }
-    weight = evaluated.sum { |item| item['peso'] }
+    weight = evaluated.sum { |item| item['peso'] }.round(8)
     points = evaluated.sum { |item| item['pontos'] }.round(2)
     {
-      'versao' => 1, 'nota' => weight.positive? ? (points * 100 / weight).round(2) : nil,
+      'versao' => service_profile? ? 2 : 1, 'nota' => weight.positive? ? (points * 100 / weight).round(2).clamp(0, 100) : nil,
       'peso_avaliado' => weight, 'peso_total' => 100, 'pontos_obtidos' => points, 'parcial' => weight < 100,
       'grupos' => groups,
       'mais_contribuiram' => ranked(evaluated, 'pontos'),
-      'mais_reduziram' => ranked(evaluated, 'pontos_perdidos')
+      'mais_reduziram' => ranked(evaluated, 'pontos_perdidos'),
+      'proporcao_papeis' => service_profile? ? JrcVoiceQuality::ServiceEmotionalProfile::ROLES : nil
     }
   end
 
@@ -49,12 +50,15 @@ class JrcVoiceQuality::OverallScore
 
   private
 
+  def service_profile?
+    @profile['versao'] == 3
+  end
+
   def build_groups
-    positive = @profile.fetch('positivos').merge('sorriso_na_voz' => @result.dig('analise_vocal', 'sorriso_na_voz'))
     rows = {
       'qualidade' => [quality_item],
-      'positivos' => metric_items(JrcVoiceQuality::EmotionalProfile::POSITIVE + ['sorriso_na_voz'], positive, 'positivos'),
-      'negativos' => metric_items(JrcVoiceQuality::EmotionalProfile::NEGATIVE, @profile.fetch('negativos'), 'negativos'),
+      'positivos' => emotional_items('positivos'),
+      'negativos' => emotional_items('negativos'),
       'resolucao' => [context_item('resolucao', RESOLUTION, 'situacao')],
       'evolucao' => [context_item('evolucao', EVOLUTION, 'resultado')]
     }
@@ -62,6 +66,29 @@ class JrcVoiceQuality::OverallScore
       evaluated = items.reject { |item| item['nota'].nil? }
       { 'id' => id, 'peso' => WEIGHTS.fetch(id), 'peso_avaliado' => evaluated.sum { |item| item['peso'] },
         'pontos' => evaluated.sum { |item| item['pontos'] }.round(2), 'indicadores' => items }
+    end
+  end
+
+  def emotional_items(group)
+    return service_emotional_items(group) if service_profile?
+
+    if group == 'positivos'
+      positive = @profile.fetch(group).merge('sorriso_na_voz' => @result.dig('analise_vocal', 'sorriso_na_voz'))
+      metric_items(JrcVoiceQuality::EmotionalProfile::POSITIVE + ['sorriso_na_voz'], positive, group)
+    else
+      metric_items(JrcVoiceQuality::EmotionalProfile::NEGATIVE, @profile.fetch(group), group)
+    end
+  end
+
+  def service_emotional_items(group)
+    contract = JrcVoiceQuality::ServiceEmotionalProfile
+    weights = group == 'positivos' ? contract::POSITIVE_WEIGHTS : contract::NEGATIVE_WEIGHTS
+    contract::ROLES.flat_map do |role, fraction|
+      weights.map do |name, priority|
+        metric = name == 'sorriso_na_voz' ? @result.dig('analise_vocal', role, name) : @profile.dig(role, group, name)
+        weight = WEIGHTS.fetch(group) * fraction * priority / weights.values.sum
+        item("#{role}.#{name}", group, metric || {}, weight: weight).merge('papel' => role, 'indicador' => name, 'prioridade' => priority)
+      end
     end
   end
 
@@ -81,16 +108,17 @@ class JrcVoiceQuality::OverallScore
     item(group, group, { 'nota' => mapping[context.fetch(state)], 'observacao' => context['justificativa'], 'evidencias' => evidence })
   end
 
-  def item(id, group, metric, scale: 10, count: 1)
+  def item(id, group, metric, scale: 10, count: 1, weight: nil)
     note = metric['nota']
-    weight = WEIGHTS.fetch(group).to_f / count
+    weight ||= WEIGHTS.fetch(group).to_f / count
     normalized = group == 'negativos' && !note.nil? ? scale - note : note
-    points = normalized.nil? ? nil : (normalized.to_f / scale * weight).round(2)
+    precision = service_profile? ? 10 : 2
+    points = normalized.nil? ? nil : (normalized.to_f / scale * weight).round(precision)
     {
       'id' => id, 'grupo' => group, 'nota' => note, 'escala' => scale, 'peso' => weight, 'pontos' => points,
-      'pontos_perdidos' => points.nil? ? nil : (weight - points).round(2),
+      'pontos_perdidos' => points.nil? ? nil : (weight - points).round(precision),
       'observacao' => metric['observacao'].to_s, 'evidencias' => metric['evidencias'] || [],
-      'fonte' => id == 'sorriso_na_voz' ? 'audio' : 'transcricao'
+      'fonte' => id.split('.').last == 'sorriso_na_voz' ? 'audio' : 'transcricao'
     }
   end
 

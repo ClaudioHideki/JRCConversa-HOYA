@@ -7,8 +7,9 @@ defineProps({
   metric: { type: Object, default: () => ({}) },
   negative: { type: Boolean, default: false },
   audio: { type: Boolean, default: false },
+  priority: { type: Number, default: null },
 });
-const { tm } = useI18n();
+const { t, tm } = useI18n();
 const labels = computed(() => tm('JRC_CONTACT_CENTER.RECORDINGS.EMOTIONS'));
 const tr = key =>
   key.split('.').reduce((value, part) => value?.[part], labels.value);
@@ -35,6 +36,16 @@ const tr = key =>
     </div>
     <p class="mt-1 text-xs text-n-slate-10">
       {{ tr(audio ? 'AUDIO_SOURCE' : 'TEXT_SOURCE') }}
+    </p>
+    <p
+      v-if="priority != null"
+      class="mt-1 text-xs font-semibold text-n-slate-10"
+    >
+      {{
+        t('JRC_CONTACT_CENTER.RECORDINGS.EMOTIONS.PRIORITY', {
+          weight: priority,
+        })
+      }}
     </p>
     <div v-if="metric.nota != null" class="mt-3 flex gap-1" aria-hidden="true">
       <span
