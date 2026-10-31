@@ -2,7 +2,10 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 
-const props = defineProps({ score: { type: Object, required: true } });
+const props = defineProps({
+  score: { type: Object, required: true },
+  result: { type: Object, default: () => ({}) },
+});
 const { t, tm } = useI18n();
 const labels = computed(() =>
   tm('JRC_CONTACT_CENTER.RECORDINGS.GENERAL_SCORE')
@@ -25,25 +28,25 @@ const title = item => {
     metrics.value[item.indicador || item.id] || labels.value.GROUPS[item.grupo];
   return item.papel ? `${labels.value.ROLES[item.papel]} · ${name}` : name;
 };
-const highlights = computed(() =>
-  [
-    {
-      id: 'positive',
-      title: tr('CONTRIBUTED'),
-      field: 'pontos',
-      items: props.score.mais_contribuiram,
-    },
-    {
-      id: 'attention',
-      title: tr('REDUCED'),
-      field: 'pontos_perdidos',
-      items: props.score.mais_reduziram,
-    },
-  ].map(group => ({
-    ...group,
-    items: group.items.map(id => items.value.find(item => item.id === id)),
-  }))
-);
+const findings = computed(() => {
+  const positives = [...new Set(props.result.pontos_positivos || [])];
+  const improvements = [
+    ...new Set([
+      ...(props.result.pontos_negativos || []),
+      ...(props.result.oportunidades_melhoria || []),
+    ]),
+  ];
+  const conflicts = positives.filter(text => improvements.includes(text));
+  return {
+    positives: positives.filter(text => !conflicts.includes(text)),
+    improvements: improvements.filter(text => !conflicts.includes(text)),
+    conflicts,
+  };
+});
+const highlights = computed(() => [
+  { id: 'positive', title: tr('CONTRIBUTED'), items: findings.value.positives },
+  { id: 'attention', title: tr('REDUCED'), items: findings.value.improvements },
+]);
 </script>
 
 <template>
@@ -97,33 +100,17 @@ const highlights = computed(() =>
             group.id === 'positive' ? tr('EARNED_NOTICE') : tr('LOST_NOTICE')
           }}
         </p>
-        <ol v-if="group.items.length" class="mt-4 space-y-4">
+        <ol
+          v-if="group.items.length"
+          class="mt-4 space-y-4"
+          :data-testid="`score-findings-${group.id}`"
+        >
           <li
-            v-for="item in group.items"
-            :key="item.id"
-            class="min-w-0 border-t border-n-weak pt-3 text-sm"
+            v-for="finding in group.items"
+            :key="finding"
+            class="min-w-0 break-words border-t border-n-weak pt-3 text-sm"
           >
-            <div class="flex flex-wrap justify-between gap-2 font-semibold">
-              <p>{{ title(item) }}</p>
-              <p>{{ number(item[group.field]) }} {{ tr('POINTS_UNIT') }}</p>
-            </div>
-            <p class="mt-2 break-words text-xs leading-relaxed">
-              {{ item.observacao || tr('NO_REASON') }}
-            </p>
-            <details v-if="item.evidencias.length" class="mt-2 text-xs">
-              <summary class="cursor-pointer font-semibold text-n-blue-11">
-                {{ tr('EVIDENCE') }}
-              </summary>
-              <ul class="mt-2 list-disc space-y-2 pl-4">
-                <li
-                  v-for="(quote, index) in item.evidencias"
-                  :key="index"
-                  class="break-words"
-                >
-                  {{ quote }}
-                </li>
-              </ul>
-            </details>
+            {{ finding }}
           </li>
         </ol>
         <p v-else class="mt-4 text-xs text-n-slate-10">
@@ -131,6 +118,26 @@ const highlights = computed(() =>
         </p>
       </section>
     </div>
+    <section
+      v-if="findings.conflicts.length"
+      class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"
+      data-testid="score-findings-conflicts"
+    >
+      <h4 class="font-semibold">{{ tr('CONFLICTING_FINDINGS') }}</h4>
+      <p class="mt-2 text-xs">{{ tr('CONFLICTING_NOTICE') }}</p>
+      <ul class="mt-3 list-disc space-y-2 pl-4">
+        <li
+          v-for="finding in findings.conflicts"
+          :key="finding"
+          class="break-words"
+        >
+          {{ finding }}
+        </li>
+      </ul>
+    </section>
+    <p class="text-xs leading-relaxed text-n-slate-10">
+      {{ tr('FINDINGS_NOTICE') }}
+    </p>
     <details
       class="rounded-xl border border-n-weak p-4"
       data-testid="score-calculation"
@@ -167,13 +174,14 @@ const highlights = computed(() =>
         </div>
       </dl>
       <div class="min-w-0 overflow-x-auto">
-        <table class="w-full table-fixed text-left text-xs">
+        <table class="w-full min-w-[640px] table-fixed text-left text-xs">
           <thead class="bg-n-solid-2 text-n-slate-10">
             <tr>
-              <th class="w-[44%] break-words p-2">{{ tr('INDICATOR') }}</th>
-              <th class="w-[20%] break-words p-2">{{ tr('RATING') }}</th>
-              <th class="w-[16%] break-words p-2">{{ tr('WEIGHT') }}</th>
-              <th class="w-[20%] break-words p-2">{{ tr('EARNED') }}</th>
+              <th class="w-[40%] break-words p-2">{{ tr('INDICATOR') }}</th>
+              <th class="w-[14%] break-words p-2">{{ tr('RATING') }}</th>
+              <th class="w-[14%] break-words p-2">{{ tr('WEIGHT') }}</th>
+              <th class="w-[16%] break-words p-2">{{ tr('EARNED') }}</th>
+              <th class="w-[16%] break-words p-2">{{ tr('NOT_EARNED') }}</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-n-weak">
@@ -183,6 +191,20 @@ const highlights = computed(() =>
                 <p class="mt-1 break-words leading-relaxed text-n-slate-10">
                   {{ item.observacao }}
                 </p>
+                <details v-if="item.evidencias.length" class="mt-2">
+                  <summary class="cursor-pointer font-semibold text-n-blue-11">
+                    {{ tr('EVIDENCE') }}
+                  </summary>
+                  <ul class="mt-2 list-disc space-y-2 pl-4">
+                    <li
+                      v-for="(quote, index) in item.evidencias"
+                      :key="index"
+                      class="break-words"
+                    >
+                      {{ quote }}
+                    </li>
+                  </ul>
+                </details>
               </th>
               <td class="break-words p-2">
                 {{
@@ -196,6 +218,9 @@ const highlights = computed(() =>
               </td>
               <td class="break-words p-2 font-semibold">
                 {{ number(item.pontos) }}
+              </td>
+              <td class="break-words p-2">
+                {{ number(item.pontos_perdidos) }}
               </td>
             </tr>
           </tbody>

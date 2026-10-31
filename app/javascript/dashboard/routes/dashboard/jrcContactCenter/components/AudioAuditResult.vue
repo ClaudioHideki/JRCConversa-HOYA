@@ -175,6 +175,7 @@ const excerpt = value => {
     <ScoreBreakdown
       v-if="result.pontuacao_geral"
       :score="result.pontuacao_geral"
+      :result="result"
     />
     <EmotionalProfile :result="result" />
     <div

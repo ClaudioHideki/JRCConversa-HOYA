@@ -210,3 +210,142 @@ it('labels every calculated contribution with its actor and preserves different 
   expect(wrapper.text()).toContain('0,57%');
   expect(wrapper.text()).not.toContain('2,5% cada');
 });
+
+it('separates concrete strengths from improvements and shows the same criterion only once in the calculation', () => {
+  const observation = 'O atendimento não conseguiu solucionar o problema.';
+  const score = {
+    versao: 2,
+    nota: 49,
+    peso_avaliado: 60,
+    pontos_obtidos: 29.4,
+    parcial: true,
+    grupos: [
+      {
+        id: 'qualidade',
+        peso: 60,
+        peso_avaliado: 60,
+        pontos: 29.4,
+        indicadores: [
+          {
+            id: 'qualidade',
+            grupo: 'qualidade',
+            nota: 49,
+            escala: 100,
+            peso: 60,
+            pontos: 29.4,
+            pontos_perdidos: 30.6,
+            observacao: observation,
+            evidencias: ['Vou verificar.'],
+          },
+        ],
+      },
+    ],
+    mais_contribuiram: ['qualidade'],
+    mais_reduziram: ['qualidade'],
+  };
+  const data = {
+    pontos_positivos: ['Procurou orientação técnica.'],
+    pontos_negativos: ['Não confirmou o entendimento do cliente.'],
+    oportunidades_melhoria: ['Explicar os próximos passos.'],
+  };
+  const before = JSON.stringify(score);
+  const wrapper = mount(ScoreBreakdown, {
+    props: { score, result: data },
+    global: globalOptions(),
+  });
+  expect(wrapper.get('[data-testid=score-findings-positive]').text()).toBe(
+    'Procurou orientação técnica.'
+  );
+  expect(
+    wrapper.get('[data-testid=score-findings-attention]').text()
+  ).toContain('Não confirmou o entendimento');
+  expect(
+    wrapper.get('[data-testid=score-findings-attention]').text()
+  ).toContain('Explicar os próximos passos.');
+  const calculation = wrapper.get('[data-testid=score-calculation]');
+  expect(calculation.findAll('tbody tr')).toHaveLength(1);
+  expect(calculation.text()).toContain('29,4');
+  expect(calculation.text()).toContain('30,6');
+  expect(wrapper.text().split(observation)).toHaveLength(2);
+  expect(calculation.text()).toContain('Vou verificar.');
+  expect(JSON.stringify(score)).toBe(before);
+});
+
+it('does not manufacture strengths or shortcomings from a generic observation in a historical result', () => {
+  const score = {
+    nota: 67,
+    peso_avaliado: 60,
+    pontos_obtidos: 40.2,
+    parcial: true,
+    grupos: [
+      {
+        id: 'qualidade',
+        peso: 60,
+        peso_avaliado: 60,
+        pontos: 40.2,
+        indicadores: [
+          {
+            id: 'qualidade',
+            grupo: 'qualidade',
+            nota: 67,
+            escala: 100,
+            peso: 60,
+            pontos: 40.2,
+            pontos_perdidos: 19.8,
+            observacao: 'Justificativa geral mista.',
+            evidencias: [],
+          },
+        ],
+      },
+    ],
+    mais_contribuiram: ['qualidade'],
+    mais_reduziram: ['qualidade'],
+  };
+  const wrapper = mount(ScoreBreakdown, {
+    props: { score },
+    global: globalOptions(),
+  });
+  expect(wrapper.find('[data-testid=score-findings-positive]').exists()).toBe(
+    false
+  );
+  expect(wrapper.find('[data-testid=score-findings-attention]').exists()).toBe(
+    false
+  );
+  expect(wrapper.text().match(/Justificativa geral mista\./g)).toHaveLength(1);
+  expect(wrapper.text()).toContain('40,2');
+  expect(wrapper.text()).toContain('19,8');
+});
+
+it('shows an identical finding reported on both sides only once for review instead of praising and penalizing it', () => {
+  const score = {
+    grupos: [],
+    nota: null,
+    peso_avaliado: 0,
+    pontos_obtidos: 0,
+    parcial: true,
+  };
+  const wrapper = mount(ScoreBreakdown, {
+    props: {
+      score,
+      result: {
+        pontos_positivos: ['Achado contraditório.', 'Orientação clara.'],
+        pontos_negativos: ['Achado contraditório.'],
+        oportunidades_melhoria: [
+          'Confirmar entendimento.',
+          'Confirmar entendimento.',
+        ],
+      },
+    },
+    global: globalOptions(),
+  });
+  expect(wrapper.get('[data-testid=score-findings-positive]').text()).toBe(
+    'Orientação clara.'
+  );
+  expect(wrapper.get('[data-testid=score-findings-attention]').text()).toBe(
+    'Confirmar entendimento.'
+  );
+  expect(
+    wrapper.get('[data-testid=score-findings-conflicts]').text()
+  ).toContain('Achado contraditório.');
+  expect(wrapper.text().match(/Achado contraditório\./g)).toHaveLength(1);
+});
