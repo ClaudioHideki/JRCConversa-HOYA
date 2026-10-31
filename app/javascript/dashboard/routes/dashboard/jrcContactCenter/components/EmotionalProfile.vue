@@ -10,7 +10,7 @@ const tr = key =>
   key.split('.').reduce((value, part) => value?.[part], labels.value);
 const profile = computed(() => props.result.perfil_emocional);
 const activeRole = ref('atendente');
-const separateRoles = computed(() => profile.value?.versao === 3);
+const separateRoles = computed(() => [3, 4].includes(profile.value?.versao));
 const actor = computed(() =>
   separateRoles.value ? profile.value[activeRole.value] : profile.value
 );
@@ -79,13 +79,16 @@ const phases = ['inicio', 'meio', 'fim'];
 
 <template>
   <section class="mb-6 min-w-0 space-y-5" data-testid="emotional-profile">
-    <template v-if="[2, 3].includes(profile?.versao)">
+    <template v-if="[2, 3, 4].includes(profile?.versao)">
       <header>
         <h3 class="text-base font-bold text-n-slate-12">
           {{ tr(separateRoles ? 'SERVICE_TITLE' : 'TITLE') }}
         </h3>
         <p class="mt-2 text-sm leading-relaxed text-n-slate-10">
           {{ tr('DESCRIPTION') }}
+        </p>
+        <p class="mt-2 text-xs leading-relaxed text-n-slate-10">
+          {{ tr('SIGNAL_RULES') }}
         </p>
       </header>
       <template v-if="separateRoles">

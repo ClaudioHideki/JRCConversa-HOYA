@@ -1,5 +1,5 @@
 class JrcVoiceQuality::ServiceEmotionalProfile < JrcVoiceQuality::EmotionalProfile
-  VERSION = 3
+  VERSION = 4
   ROLES = { 'atendente' => 0.8, 'cliente' => 0.2 }.freeze
   POSITIVE_WEIGHTS = { 'satisfacao' => 10, 'confianca' => 9, 'encantamento' => 8, 'atendimento_acolhedor' => 8,
                        'compreensao' => 7, 'alivio' => 6, 'sorriso_na_voz' => 5 }.freeze
@@ -15,13 +15,33 @@ class JrcVoiceQuality::ServiceEmotionalProfile < JrcVoiceQuality::EmotionalProfi
     object({ versao: { type: 'integer', enum: [VERSION] }, atendente: actor, cliente: actor }.merge(context))
   end
 
-  def self.normalize(profile, transcript:)
+  def self.speaker_context(vocal, transcript:)
+    return {} unless vocal.is_a?(Hash) && vocal['versao'] == 3
+
+    ROLES.keys.filter_map do |role|
+      actor = vocal[role]
+      next unless actor.is_a?(Hash) && actor['identificado'] == true
+
+      quotes = actor['evidencias_identificacao']
+      next unless quotes.is_a?(Array) && quotes.present? && quotes.all? { |quote| quote.is_a?(String) }
+      next unless citations_supported?(quotes, transcript)
+
+      [role, actor.slice('identificado', 'evidencias_identificacao', 'justificativa_identificacao')]
+    end.to_h
+  end
+
+  def self.normalize(profile, transcript:, speakers: {})
     invalid! unless JSONSchemer.schema(schema.deep_stringify_keys).valid?(profile)
 
     normalized = profile.deep_dup
     ROLES.each_key do |role|
       actor = normalized.fetch(role)
       actor['limitacoes'] = []
+      evidence = speakers[role]
+      if evidence&.dig('identificado') == true && evidence['evidencias_identificacao'].present? &&
+         citations_supported?(evidence['evidencias_identificacao'], transcript)
+        actor.merge!(evidence.slice('identificado', 'evidencias_identificacao', 'justificativa_identificacao'))
+      end
       normalize_identification!(actor, transcript)
       normalize_metrics!(actor, transcript)
       normalized['limitacoes'].concat(actor.delete('limitacoes').map { |limitation| "#{role}: #{limitation}" })
@@ -68,6 +88,8 @@ class JrcVoiceQuality::ServiceEmotionalProfile < JrcVoiceQuality::EmotionalProfi
       O foco da monitoria empresarial e COMO O ATENDENTE TRATOU O CLIENTE. Avalie condutas observaveis, nunca personalidade ou saude mental.
       Nao misture falas, sentimentos ou sinais dos dois papeis. Sem identificar o papel, deixe os indicadores dele nao avaliados.
       Em cada perfil, identificado exige evidencias_identificacao literais que sustentem o papel e justificativa_identificacao contextual.
+      Quando houver atribuicao de papeis pelo audio com citacoes conferidas, use-a como referencia para interpretar as falas.
+      Nao copie uma emocao do outro papel. Mesmo com papel conhecido, uma nota exige sua propria evidencia literal.
       Se nao houver suporte, identificado=false, evidencias_identificacao=[] e todas as notas desse papel null. Nunca adivinhe interlocutores.
       No atendente, satisfacao corresponde ao cuidado demonstrado com a experiencia do cliente; confianca a seguranca na orientacao;
       encantamento a iniciativas que superam expectativas; atendimento_acolhedor a empatia, cordialidade e respeito;

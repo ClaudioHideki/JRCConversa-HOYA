@@ -65,21 +65,7 @@ class JrcVoiceQuality::OpenaiClient
     response = json_connection.post('chat/completions') do |request|
       request.body = {
         model: analysis_model,
-        messages: [
-          {
-            role: 'system',
-            content: system_prompt
-          },
-          {
-            role: 'user',
-            content: <<~TEXT
-              Analise a ligacao abaixo como monitoria de qualidade de call center.
-
-              Transcricao:
-              #{transcript}
-            TEXT
-          }
-        ],
+        messages: analysis_messages(transcript),
         response_format: {
           type: 'json_schema',
           json_schema: {
@@ -108,6 +94,18 @@ class JrcVoiceQuality::OpenaiClient
   end
 
   private
+
+  def analysis_messages(transcript)
+    [
+      { role: 'system', content: system_prompt },
+      { role: 'user', content: <<~TEXT }
+        Analise a ligacao abaixo como monitoria de qualidade de call center.
+
+        Transcricao:
+        #{transcript}
+      TEXT
+    ]
+  end
 
   def api_key
     provider.api_key

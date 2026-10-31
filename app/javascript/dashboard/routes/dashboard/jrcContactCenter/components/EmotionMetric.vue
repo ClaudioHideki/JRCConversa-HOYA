@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 
-defineProps({
+const props = defineProps({
   title: { type: String, required: true },
   metric: { type: Object, default: () => ({}) },
   negative: { type: Boolean, default: false },
@@ -13,6 +13,34 @@ const { t, tm } = useI18n();
 const labels = computed(() => tm('JRC_CONTACT_CENTER.RECORDINGS.EMOTIONS'));
 const tr = key =>
   key.split('.').reduce((value, part) => value?.[part], labels.value);
+const signal = computed(() => {
+  if (props.metric.nota == null) return 'unassessed';
+  const favorable = props.negative ? 10 - props.metric.nota : props.metric.nota;
+  if (favorable < 4) return 'unfavorable';
+  if (favorable < 7) return 'attention';
+  return 'favorable';
+});
+const barColor = computed(
+  () =>
+    ({
+      unfavorable: 'bg-red-500',
+      attention: 'bg-amber-500',
+      favorable: 'bg-emerald-500',
+      unassessed: 'bg-n-alpha-2',
+    })[signal.value]
+);
+const signalColor = computed(
+  () =>
+    ({
+      unfavorable:
+        'bg-red-50 text-red-800 dark:bg-red-500/10 dark:text-red-300',
+      attention:
+        'bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300',
+      favorable:
+        'bg-emerald-50 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300',
+      unassessed: 'bg-n-solid-2 text-n-slate-10',
+    })[signal.value]
+);
 </script>
 
 <template>
@@ -47,17 +75,20 @@ const tr = key =>
         })
       }}
     </p>
-    <div v-if="metric.nota != null" class="mt-3 flex gap-1" aria-hidden="true">
+    <p
+      class="mt-3 inline-flex rounded-full px-2 py-1 text-xs font-semibold"
+      :class="signalColor"
+      data-testid="metric-signal"
+    >
+      {{ tr(`SIGNALS.${signal}`) }}
+    </p>
+    <div class="mt-3 flex gap-1" aria-hidden="true">
       <span
         v-for="step in 10"
         :key="step"
         class="h-2 flex-1 rounded-sm"
         :class="
-          step <= metric.nota
-            ? negative
-              ? 'bg-amber-500'
-              : 'bg-emerald-500'
-            : 'bg-n-alpha-2'
+          metric.nota != null && step <= metric.nota ? barColor : 'bg-n-alpha-2'
         "
       />
     </div>

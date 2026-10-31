@@ -1,7 +1,9 @@
 require 'minitest/autorun'
+require 'minitest/mock'
 require 'active_support/all'
 require 'json_schemer'
 require 'faraday'
+require 'faraday/adapter/test'
 require 'tempfile'
 require_relative '../../app/services/jrc_voice_quality'
 require_relative '../../app/services/jrc_voice_quality/emotional_profile'
@@ -18,7 +20,7 @@ class ServiceEmotionalProfileTest < Minitest::Test
   def setup
     @transcript = 'Atendente: Bom dia, vou ajudar. Cliente: Estou preocupado. Atendente: O acesso foi restabelecido. Cliente: Agora funciona.'
     @metric = { 'nota' => 10, 'confianca' => 'alta', 'evidencias' => ['Bom dia, vou ajudar.'], 'observacao' => 'Conduta verificável.' }
-    @profile = { 'versao' => 3, 'limitacoes' => [] }
+    @profile = { 'versao' => Profile::VERSION, 'limitacoes' => [] }
     Profile::ROLES.each_key do |role|
       quote = role == 'atendente' ? 'Bom dia, vou ajudar.' : 'Agora funciona.'
       metric = @metric.merge('evidencias' => [quote])
@@ -32,8 +34,11 @@ class ServiceEmotionalProfileTest < Minitest::Test
                             'inicio' => { 'observacao' => 'Preocupado.', 'evidencias' => ['Estou preocupado.'] },
                             'meio' => { 'observacao' => '', 'evidencias' => [] },
                             'fim' => { 'observacao' => 'Acesso confirmado.', 'evidencias' => ['Agora funciona.'] } }
-    @voice = { 'versao' => 2, 'atendente' => { 'identificado' => true, 'sorriso_na_voz' => @metric.deep_dup },
-               'cliente' => { 'identificado' => true, 'sorriso_na_voz' => @metric.deep_dup }, 'limitacoes' => '' }
+    @voice = { 'versao' => 3, 'limitacoes' => '' }
+    Profile::ROLES.each_key do |role|
+      @voice[role] = @profile[role].slice('identificado', 'evidencias_identificacao', 'justificativa_identificacao').deep_dup
+      @voice[role]['sorriso_na_voz'] = @metric.deep_dup
+    end
     @result = { 'perfil_emocional' => @profile, 'avaliacao_atendente' => { 'nota_final' => 100 },
                 'analise_vocal' => @voice, 'alerta_supervisao' => false }
   end
@@ -152,7 +157,7 @@ class ServiceEmotionalProfileTest < Minitest::Test
 
   def test_new_recording_schema_preserves_the_separate_pabx_contract
     client = JrcVoiceQuality::MonitoringClient.new(account: nil)
-    assert_equal [3], client.send(:analysis_schema).dig(:properties, :perfil_emocional, :properties, :versao, :enum)
+    assert_equal [4], client.send(:analysis_schema).dig(:properties, :perfil_emocional, :properties, :versao, :enum)
     refute JrcVoiceQuality::OpenaiClient.new(account: nil).send(:analysis_schema)[:properties].key?(:perfil_emocional)
     assert_includes Profile.instructions, 'Nao transfira a agressividade do cliente'
     assert_includes Profile.instructions, 'dependencia de terceiros'
@@ -162,7 +167,7 @@ class ServiceEmotionalProfileTest < Minitest::Test
     @voice['cliente']['identificado'] = false
     @voice['atendente']['sorriso_na_voz']['evidencias'] = ['Tom leve, ritmo receptivo.']
     payload = @voice.except('versao')
-    JrcVoiceQuality::VocalClient.new(account: nil).send(:validate!, payload)
+    JrcVoiceQuality::VocalClient.new(account: nil).send(:validate!, payload, transcript: @transcript)
     assert_nil payload.dig('cliente', 'sorriso_na_voz', 'nota')
     assert_empty payload.dig('cliente', 'sorriso_na_voz', 'evidencias')
     assert_equal 10, payload.dig('atendente', 'sorriso_na_voz', 'nota')
@@ -171,24 +176,115 @@ class ServiceEmotionalProfileTest < Minitest::Test
 
   def test_vocal_invalid_structure_still_fails_with_the_specific_error
     error = assert_raises(JrcVoiceQuality::AnalysisError) do
-      JrcVoiceQuality::VocalClient.new(account: nil).send(:validate!, { 'cliente_identificado' => true })
+      JrcVoiceQuality::VocalClient.new(account: nil).send(:validate!, { 'cliente_identificado' => true }, transcript: @transcript)
     end
     assert_equal :vocal_analysis_failed, error.code
   end
 
-  def test_a_single_audio_request_evaluates_both_roles_without_reading_from_transcript
+  def test_a_single_audio_request_receives_real_audio_and_transcript_as_reference_for_role_attribution
     client = JrcVoiceQuality::VocalClient.new(account: nil)
     def client.audio_model = 'configured-audio'
     Tempfile.create(['synthetic-', '.mp3']) do |file|
       file.write('synthetic request-format fixture'); file.flush
-      body = client.send(:request_body, file.path)
+      body = client.send(:request_body, file.path, @transcript)
       assert_equal 'configured-audio', body[:model]
       assert_equal ['text'], body[:modalities]
       assert_equal false, body[:store]
+      assert_includes body[:messages][1][:content][0][:text], @transcript
       input = body[:messages][1][:content][1][:input_audio]
       assert_equal File.binread(file.path), Base64.strict_decode64(input[:data])
       assert_includes body[:messages][0][:content], 'ATENDENTE e CLIENTE SEPARADAMENTE'
       assert_equal 1, body[:messages][1][:content].count { |item| item[:type] == 'input_audio' }
     end
+  end
+
+  def test_audio_anchors_prevent_a_bad_text_identity_quote_from_erasing_supported_agent_metrics
+    @profile['atendente']['evidencias_identificacao'] = ['Paráfrase ausente.']
+    speakers = Profile.speaker_context(@voice, transcript: @transcript)
+    result = Profile.normalize(@profile, transcript: @transcript, speakers: speakers)
+    assert_equal true, result.dig('atendente', 'identificado')
+    assert_equal ['Bom dia, vou ajudar.'], result.dig('atendente', 'evidencias_identificacao')
+    assert_equal 10, result.dig('atendente', 'positivos', 'satisfacao', 'nota')
+    assert_equal 0, result.dig('atendente', 'negativos', 'agressividade', 'nota')
+    assert_equal @profile['cliente'], result['cliente']
+  end
+
+  def test_audio_identity_does_not_validate_an_invented_metric_quote
+    @profile['atendente']['evidencias_identificacao'] = ['Paráfrase ausente.']
+    @profile['atendente']['positivos']['satisfacao']['evidencias'] = ['Nota sem suporte.']
+    result = Profile.normalize(@profile, transcript: @transcript, speakers: Profile.speaker_context(@voice, transcript: @transcript))
+    assert_nil result.dig('atendente', 'positivos', 'satisfacao', 'nota')
+    assert_equal 10, result.dig('atendente', 'positivos', 'confianca', 'nota')
+  end
+
+  def test_audio_recognition_without_a_literal_anchor_cannot_unlock_text_metrics
+    @voice['atendente']['evidencias_identificacao'] = ['Frase que não existe.']
+    @profile['atendente']['evidencias_identificacao'] = []
+    context = Profile.speaker_context(@voice, transcript: @transcript)
+    refute context.key?('atendente')
+    result = Profile.normalize(@profile, transcript: @transcript, speakers: context)
+    assert_equal false, result.dig('atendente', 'identificado')
+    assert_nil result.dig('atendente', 'positivos', 'confianca', 'nota')
+    assert_empty Profile.speaker_context(@voice.merge('versao' => 2), transcript: @transcript)
+  end
+
+  def test_identifying_a_role_never_invents_notes_for_unassessed_metrics
+    @profile['atendente']['identificado'] = false
+    @profile['atendente']['evidencias_identificacao'] = []
+    @profile['atendente'].values_at('positivos', 'negativos').flat_map(&:values).each do |metric|
+      metric.merge!('nota' => nil, 'confianca' => 'insuficiente', 'evidencias' => [])
+    end
+    result = Profile.normalize(@profile, transcript: @transcript, speakers: Profile.speaker_context(@voice, transcript: @transcript))
+    assert_equal true, result.dig('atendente', 'identificado')
+    assert_nil result.dig('atendente', 'positivos', 'satisfacao', 'nota')
+    assert_equal 10, result.dig('cliente', 'positivos', 'satisfacao', 'nota')
+  end
+
+  def test_vocal_validation_removes_unverifiable_anchors_without_fabricating_a_transcript_or_a_smile
+    payload = @voice.except('versao').deep_dup
+    payload['atendente']['evidencias_identificacao'] << 'Invenção.'
+    payload['cliente']['evidencias_identificacao'] = ['Outra invenção.']
+    JrcVoiceQuality::VocalClient.new(account: nil).send(:validate!, payload, transcript: @transcript)
+    assert_equal ['Bom dia, vou ajudar.'], payload.dig('atendente', 'evidencias_identificacao')
+    assert_empty payload.dig('cliente', 'evidencias_identificacao')
+    assert_equal 10, payload.dig('atendente', 'sorriso_na_voz', 'nota')
+  end
+
+  def test_pabx_messages_remain_unchanged_without_any_audio_context
+    client = JrcVoiceQuality::OpenaiClient.new(account: nil)
+    messages = client.send(:analysis_messages, @transcript)
+    assert_equal %w[system user], messages.map { |message| message[:role] }
+    assert_equal "Analise a ligacao abaixo como monitoria de qualidade de call center.\n\nTranscricao:\n#{@transcript}\n",
+                 messages.last[:content]
+  end
+
+  def test_grounded_context_is_sent_as_user_data_preserves_the_transcript_and_never_leaks_to_the_next_request
+    @profile['atendente']['evidencias_identificacao'] = ['Citação incorreta.']
+    response = @result.except('analise_vocal').merge('avaliacao_atendente_aplicavel' => true).to_json
+    requests = []
+    connection = Faraday.new do |faraday|
+      faraday.adapter :test do |adapter|
+        adapter.post('chat/completions') do |request|
+          requests << JSON.parse(request.body)
+          [200, {}, { choices: [{ message: { content: response } }] }.to_json]
+        end
+      end
+    end
+    provider = Struct.new(:default_model).new('local-text')
+    client = JrcVoiceQuality::MonitoringClient.new(account: nil)
+    client.stub(:provider, provider) do
+      client.stub(:json_connection, connection) do
+        first = client.analyze!(@transcript, vocal: @voice)
+        second = client.analyze!(@transcript)
+        assert_equal @transcript, first['texto_transcrito']
+        assert_equal true, first.dig('perfil_emocional', 'atendente', 'identificado')
+        assert_equal 10, first.dig('perfil_emocional', 'atendente', 'positivos', 'satisfacao', 'nota')
+        assert_equal false, second.dig('perfil_emocional', 'atendente', 'identificado')
+        assert_empty second['atribuicao_papeis']
+      end
+    end
+    assert_includes requests[0]['messages'].last['content'], 'Atribuicao contextual pelo audio'
+    refute_includes requests[0]['messages'].first['content'], 'Bom dia, vou ajudar.'
+    refute_includes requests[1]['messages'].last['content'], 'Atribuicao contextual pelo audio'
   end
 end

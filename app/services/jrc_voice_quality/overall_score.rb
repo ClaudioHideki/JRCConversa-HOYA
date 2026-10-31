@@ -51,7 +51,7 @@ class JrcVoiceQuality::OverallScore
   private
 
   def service_profile?
-    @profile['versao'] == 3
+    [3, 4].include?(@profile['versao'])
   end
 
   def build_groups

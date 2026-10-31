@@ -43,28 +43,35 @@ class JrcVoiceQuality::AudioAuditJob < ApplicationJob
     raise JrcVoiceQuality::ConfigurationError.new('IA não configurada.', code: :openai_not_configured) unless client.configured?
 
     transcript = audit.transcript.presence || transcribe(audit, client)
-    result = text_analysis(audit, client, transcript)
-    result['analise_vocal'] = vocal_analysis(audit) unless result.dig('analise_vocal', 'versao') == 2
+    vocal = vocal_analysis(audit, transcript)
+    result = text_analysis(audit, client, transcript, vocal)
+    result['analise_vocal'] = vocal
     result = JrcVoiceQuality::OverallScore.apply(result)
     audit.update!(status: 'completed', result: result, completed_at: Time.current)
   end
 
-  def text_analysis(audit, client, transcript)
+  def text_analysis(audit, client, transcript, vocal)
     cached = audit.result
     if cached.dig('perfil_emocional', 'versao') == JrcVoiceQuality::ServiceEmotionalProfile::VERSION &&
-       audit.analysis_model == client.analysis_model
+       audit.analysis_model == client.analysis_model &&
+       cached['atribuicao_papeis'] == JrcVoiceQuality::ServiceEmotionalProfile.speaker_context(vocal, transcript: transcript)
       JrcVoiceQuality::ServiceEmotionalProfile.validate!(cached['perfil_emocional'], transcript: transcript)
       return cached
     end
 
-    result = client.analyze!(transcript)
+    result = client.analyze!(transcript, vocal: vocal).merge('analise_vocal' => vocal)
     audit.update!(result: result, analysis_model: client.analysis_model)
     result
   end
 
-  def vocal_analysis(audit)
+  def vocal_analysis(audit, transcript)
     client = JrcVoiceQuality::VocalClient.new(account: audit.account)
-    audit.audio.blob.open { |file| client.analyze_audio!(tempfile: file) }
+    cached = audit.result['analise_vocal']
+    return cached if cached&.dig('versao') == JrcVoiceQuality::VocalClient::VERSION && cached['modelo'] == client.audio_model
+
+    result = audit.audio.blob.open { |file| client.analyze_audio!(tempfile: file, transcript: transcript) }
+    audit.update!(result: audit.result.merge('analise_vocal' => result))
+    result
   end
 
   def transcribe(audit, client)

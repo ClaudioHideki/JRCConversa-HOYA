@@ -18,14 +18,21 @@ class JrcVoiceQuality::AudioAudit < ApplicationRecord
 
   scope :completed, -> { where(status: 'completed') }
 
+  def refreshable_partial?
+    status == 'completed' && result.dig('pontuacao_geral', 'parcial') == true &&
+      result.dig('perfil_emocional', 'versao').to_i.between?(1, JrcVoiceQuality::ServiceEmotionalProfile::VERSION - 1)
+  end
+
   def summary_payload
+    finished = status == 'completed'
     {
       id: id, account_id: account_id, filename: filename, status: status,
       created_at: created_at, completed_at: completed_at, error_code: error_code,
-      nota_final: result['nota_final'], temperatura_conversa: result['temperatura_conversa'],
-      sentimento_cliente: result['sentimento_cliente'], classificacao_ligacao: result['classificacao_ligacao'],
+      nota_final: finished ? result['nota_final'] : nil, temperatura_conversa: result['temperatura_conversa'],
+      sentimento_cliente: result['sentimento_cliente'], classificacao_ligacao: finished ? result['classificacao_ligacao'] : nil,
       status_monitoria: result['status_monitoria'], alerta_supervisao: result['alerta_supervisao'],
-      score_version: result.dig('pontuacao_geral', 'versao'), score_partial: result.dig('pontuacao_geral', 'parcial')
+      score_version: result.dig('pontuacao_geral', 'versao'), score_partial: finished && result.dig('pontuacao_geral', 'parcial'),
+      refreshable_partial: refreshable_partial?
     }
   end
 

@@ -5,6 +5,8 @@ import { useI18n } from 'vue-i18n';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import AudioAuditsAPI from 'dashboard/api/audioAudits';
 import AudioAuditResult from '../components/AudioAuditResult.vue';
+import AudioAuditDialog from '../components/AudioAuditDialog.vue';
+import ClassificationBadge from '../components/ClassificationBadge.vue';
 
 const route = useRoute();
 const { t, tm } = useI18n();
@@ -28,6 +30,9 @@ const selected = ref(null);
 const opening = ref(false);
 const fileInput = ref(null);
 const audioUrl = ref('');
+const audioPlayer = ref(null);
+const reportDialog = ref(null);
+const reportVisible = ref(false);
 let generation = 0;
 let timer;
 let selecting = 0;
@@ -71,8 +76,17 @@ const cards = computed(() => [
   ],
 ]);
 const clearAudio = () => {
+  audioPlayer.value?.pause();
   if (audioUrl.value) URL.revokeObjectURL(audioUrl.value);
   audioUrl.value = '';
+};
+const closeReport = () => {
+  selecting += 1;
+  clearAudio();
+  selected.value = null;
+  opening.value = false;
+  reportVisible.value = false;
+  error.value = '';
 };
 const errorMessage = exception => {
   const code = exception?.response?.data?.error;
@@ -90,6 +104,8 @@ const openAudit = async id => {
   error.value = '';
   clearAudio();
   selected.value = null;
+  reportVisible.value = true;
+  reportDialog.value.open();
   try {
     const { data } = await AudioAuditsAPI.show(id);
     if (current === generation && request === selecting)
@@ -195,30 +211,37 @@ const upload = async () => {
 const retry = async id => {
   if (uploading.value) return;
   const current = generation;
+  const request = selecting;
   uploading.value = true;
   error.value = '';
   try {
     await AudioAuditsAPI.retryAnalysis(id);
     if (current === generation) {
-      await openAudit(id);
+      if (request === selecting) await openAudit(id);
       await refresh();
     }
   } catch (exception) {
-    if (current === generation) setError(exception);
+    if (current === generation && request === selecting) setError(exception);
   } finally {
     if (current === generation) uploading.value = false;
   }
 };
 const listen = async () => {
   const current = generation;
+  const request = selecting;
   const id = selected.value?.id;
   try {
     const { data } = await AudioAuditsAPI.recording(id);
-    if (current !== generation || selected.value?.id !== id) return;
+    if (
+      current !== generation ||
+      request !== selecting ||
+      selected.value?.id !== id
+    )
+      return;
     clearAudio();
     audioUrl.value = URL.createObjectURL(data);
   } catch (exception) {
-    if (current === generation) setError(exception);
+    if (current === generation && request === selecting) setError(exception);
   }
 };
 const download = () => {
@@ -241,6 +264,8 @@ watch(
   () => {
     generation += 1;
     selecting += 1;
+    reportDialog.value?.close();
+    reportVisible.value = false;
     clearInterval(timer);
     clearAudio();
     items.value = [];
@@ -279,7 +304,7 @@ onUnmounted(() => {
       </p>
     </header>
     <p
-      v-if="error"
+      v-if="error && !reportVisible"
       role="alert"
       class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
     >
@@ -513,7 +538,9 @@ onUnmounted(() => {
                     {{ t('JRC_CONTACT_CENTER.RECORDINGS.PARTIAL_SCORE') }}
                   </p>
                 </td>
-                <td class="p-3">{{ label(item.classificacao_ligacao) }}</td>
+                <td class="p-3">
+                  <ClassificationBadge :value="item.classificacao_ligacao" />
+                </td>
                 <td class="p-3">
                   <p
                     :class="
@@ -584,40 +611,70 @@ onUnmounted(() => {
         </footer>
       </section>
     </div>
-    <p v-if="opening" role="status" class="text-sm text-n-slate-10">
-      {{ t('JRC_CONTACT_CENTER.COMMON.LOADING') }}
-    </p>
-    <div
-      v-if="selected && busy(selected.status)"
-      role="status"
-      class="rounded-xl border border-n-blue-5 bg-n-blue-1 p-5 text-sm text-n-blue-11"
-    >
-      {{ t('JRC_CONTACT_CENTER.RECORDINGS.PROCESSING') }}
-    </div>
-    <p
-      v-if="selected?.status === 'failed'"
-      role="alert"
-      class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
-    >
-      {{
-        tm('JRC_CONTACT_CENTER.RECORDINGS.ERRORS')[selected.error_code] ||
-        t('JRC_CONTACT_CENTER.RECORDINGS.ERROR')
-      }}
-    </p>
-    <audio
-      v-if="audioUrl"
-      :key="audioUrl"
-      controls
-      :src="audioUrl"
-      class="w-full"
-      :aria-label="t('JRC_CONTACT_CENTER.RECORDINGS.LISTEN')"
-    />
-    <AudioAuditResult
-      v-if="selected?.status === 'completed'"
-      :key="selected.id"
-      :audit="selected"
-      @download="download"
-      @play="listen"
-    />
+    <AudioAuditDialog ref="reportDialog" @close="closeReport">
+      <p v-if="opening" role="status" class="text-sm text-n-slate-10">
+        {{ t('JRC_CONTACT_CENTER.COMMON.LOADING') }}
+      </p>
+      <p v-if="selected" class="mb-4 break-all text-xs text-n-slate-10">
+        {{ selected.filename }}
+      </p>
+      <p
+        v-if="error"
+        role="alert"
+        class="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+      >
+        {{ error }}
+      </p>
+      <div
+        v-if="selected && busy(selected.status)"
+        role="status"
+        class="rounded-xl border border-n-blue-5 bg-n-blue-1 p-5 text-sm text-n-blue-11"
+      >
+        {{ t('JRC_CONTACT_CENTER.RECORDINGS.PROCESSING') }}
+      </div>
+      <p
+        v-if="selected?.status === 'failed'"
+        role="alert"
+        class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+      >
+        {{
+          tm('JRC_CONTACT_CENTER.RECORDINGS.ERRORS')[selected.error_code] ||
+          t('JRC_CONTACT_CENTER.RECORDINGS.ERROR')
+        }}
+      </p>
+      <audio
+        v-if="audioUrl"
+        :key="audioUrl"
+        ref="audioPlayer"
+        controls
+        :src="audioUrl"
+        class="mb-4 w-full"
+        :aria-label="t('JRC_CONTACT_CENTER.RECORDINGS.LISTEN')"
+      />
+      <AudioAuditResult
+        v-if="selected?.status === 'completed'"
+        :key="selected.id"
+        :audit="selected"
+        @download="download"
+        @play="listen"
+      />
+      <template #actions>
+        <p
+          v-if="selected?.refreshable_partial"
+          class="w-full text-xs leading-relaxed text-n-slate-10"
+        >
+          {{ t('JRC_CONTACT_CENTER.RECORDINGS.REFRESH_PARTIAL_NOTICE') }}
+        </p>
+        <button
+          v-if="selected?.refreshable_partial"
+          type="button"
+          :disabled="uploading"
+          class="rounded-lg border border-n-blue-5 px-4 py-2 text-sm font-semibold text-n-blue-11 disabled:opacity-40"
+          @click="retry(selected.id)"
+        >
+          {{ t('JRC_CONTACT_CENTER.RECORDINGS.REFRESH_PARTIAL') }}
+        </button>
+      </template>
+    </AudioAuditDialog>
   </div>
 </template>

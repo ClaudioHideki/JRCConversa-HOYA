@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import EmotionalProfile from './EmotionalProfile.vue';
 import ScoreBreakdown from './ScoreBreakdown.vue';
+import ClassificationBadge from './ClassificationBadge.vue';
 
 const props = defineProps({ audit: { type: Object, required: true } });
 const emit = defineEmits(['download', 'play']);
@@ -151,7 +152,7 @@ const excerpt = value => {
           >
             {{ t('JRC_CONTACT_CENTER.RECORDINGS.PARTIAL_SCORE') }}
           </p>
-          <p class="font-bold">{{ label(result.classificacao_ligacao) }}</p>
+          <ClassificationBadge :value="result.classificacao_ligacao" />
           <p>{{ label(result.status_monitoria) }}</p>
           <p
             class="font-semibold"

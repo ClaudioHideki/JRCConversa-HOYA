@@ -31,9 +31,9 @@ class Api::V1::Accounts::JrcContactCenter::AudioAuditsController < Api::V1::Acco
   def retry_analysis
     audit = audits.find(params[:id])
     queued = audit.with_lock do
-      next false unless audit.status == 'failed'
+      next false unless audit.status == 'failed' || audit.refreshable_partial?
 
-      audit.update!(status: 'queued', error_code: nil)
+      audit.update!(status: 'queued', error_code: nil, completed_at: nil)
       true
     end
     return render json: base_payload.merge(error: 'analysis_not_failed'), status: :conflict unless queued
