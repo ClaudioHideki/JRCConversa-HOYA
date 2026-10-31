@@ -62,6 +62,19 @@ const highlights = computed(() => [
       {{ tr('SERVICE_FOCUS') }}
     </p>
     <p
+      v-if="score.ponderacao_humana"
+      data-testid="human-weighting"
+      class="rounded-xl bg-n-solid-2 p-4 text-sm leading-relaxed text-n-slate-11"
+    >
+      {{
+        t('JRC_CONTACT_CENTER.RECORDINGS.GENERAL_SCORE.HUMAN_WEIGHTING', {
+          impact: number(score.ponderacao_humana.impacto_nota),
+          before: number(score.ponderacao_humana.pontos_antes),
+          after: number(score.ponderacao_humana.pontos_depois),
+        })
+      }}
+    </p>
+    <p
       v-if="score.peso_avaliado === 0"
       role="status"
       class="rounded-xl bg-n-solid-2 p-4 text-sm text-n-slate-10"

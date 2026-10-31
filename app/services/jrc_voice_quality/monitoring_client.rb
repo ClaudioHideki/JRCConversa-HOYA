@@ -30,6 +30,17 @@ class JrcVoiceQuality::MonitoringClient < JrcVoiceQuality::OpenaiClient
       emita um parecer e justifique a nota com evidencias da transcricao.
       Nao invente contexto, falas, intencoes ou eventos ausentes no audio.
       Se nao houver evidencia suficiente, declare que nao foi possivel avaliar.
+      Na avaliacao operacional, valorize personalizacao, acolhimento, calma, escuta, seguranca e orientacao correta,
+      nos nove criterios e pesos existentes. Usar o nome naturalmente e evidencia positiva, mas sua ausencia nao e falha isolada.
+      Falar pausadamente significa ritmo adequado ao cliente, nao lentidao obrigatoria; avalie isso em clareza_comunicacao.
+      Escuta ativa entra em empatia e conducao_conversa; calma e equilibrio emocional em controle_emocional.
+      Confirmar dados e entendimento (double check) entra em cumprimento_protocolo quando necessario e aplicavel.
+      Nao invente protocolo, nem exija confirmacao ou nome quando nao forem pertinentes ou estiverem indisponiveis.
+      Nao some bonus: pontue os criterios nas escalas originais; a redistribuicao leve e feita pelo calculo do sistema.
+      Seguranca nao significa inventar respostas ou fazer promessas; admitir limites com encaminhamento adequado e profissional.
+      Nao penalize ruido, volume baixo ou voz abafada, nem confunda nitidez da gravacao com clareza da explicacao.
+      Se a transcricao nao permitir avaliar a conduta profissional, avaliacao_atendente_aplicavel=false;
+      sinalize a limitacao sem atribuir falha de atendimento. Nao penalize o atendente pela irritacao previa do cliente.
       Trechos relevantes devem conter somente citacoes presentes na transcricao.
     PROMPT
   end

@@ -106,6 +106,7 @@ beforeEach(async () => {
 afterEach(() => {
   wrapper?.unmount();
   wrapper = null;
+  vi.useRealTimers();
   config.global.plugins = plugins;
   document.body.style.overflow = '';
 });
@@ -418,4 +419,52 @@ it('keeps the chosen filter when an upload finishes instead of opening a report 
   expect(API.list).toHaveBeenLastCalledWith(1, 'alerts');
   expect(API.show).not.toHaveBeenCalled();
   expect(wrapper.get('dialog').element.open).toBe(false);
+});
+
+it('polls without dimming tabs and ignores an old poll after changing filters', async () => {
+  vi.useFakeTimers();
+  let finishPoll;
+  // Install the page timer under the fake clock.
+  wrapper.unmount();
+  API.list.mockResolvedValue({
+    data: { items: [record(1)], metrics: {}, total: 1 },
+  });
+  wrapper = mount(RecordingsPage, {
+    global: {
+      plugins: [createI18n({ legacy: false, locale: 'en', messages: { en } })],
+      stubs: {
+        Icon: true,
+        TeleportWithDirection: { template: '<div><slot /></div>' },
+      },
+    },
+  });
+  await flushPromises();
+  API.list.mockImplementationOnce(
+    () =>
+      new Promise(resolve => {
+        finishPoll = resolve;
+      })
+  );
+  await vi.advanceTimersByTimeAsync(5000);
+  expect(
+    wrapper.get('[data-testid=recording-filter-all]').attributes('disabled')
+  ).toBeUndefined();
+  expect(
+    wrapper.get('[data-testid=recording-metric-alerts]').attributes('disabled')
+  ).toBeUndefined();
+  API.list.mockResolvedValue({
+    data: { items: [record(99)], metrics: {}, total: 1 },
+  });
+  await wrapper.get('[data-testid=recording-filter-alerts]').trigger('click');
+  await flushPromises();
+  finishPoll({ data: { items: [record(22)], metrics: {}, total: 1 } });
+  await flushPromises();
+  expect(wrapper.text()).toContain('file-99.wav');
+  expect(wrapper.text()).not.toContain('file-22.wav');
+  expect(
+    wrapper
+      .get('[data-testid=recording-filter-alerts]')
+      .attributes('aria-pressed')
+  ).toBe('true');
+  vi.useRealTimers();
 });

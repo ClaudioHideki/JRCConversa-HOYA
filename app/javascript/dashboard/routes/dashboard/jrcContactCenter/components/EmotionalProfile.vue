@@ -2,15 +2,19 @@
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import EmotionMetric from './EmotionMetric.vue';
+import { recordingTabClasses } from './recordingTabClasses';
 
-const props = defineProps({ result: { type: Object, required: true } });
+const props = defineProps({
+  result: { type: Object, required: true },
+  section: { type: String, default: 'all' },
+});
 const { t, tm } = useI18n();
 const labels = computed(() => tm('JRC_CONTACT_CENTER.RECORDINGS.EMOTIONS'));
 const tr = key =>
   key.split('.').reduce((value, part) => value?.[part], labels.value);
 const profile = computed(() => props.result.perfil_emocional);
 const activeRole = ref('atendente');
-const separateRoles = computed(() => [3, 4].includes(profile.value?.versao));
+const separateRoles = computed(() => [3, 4, 5].includes(profile.value?.versao));
 const actor = computed(() =>
   separateRoles.value ? profile.value[activeRole.value] : profile.value
 );
@@ -74,12 +78,18 @@ const groups = computed(() => [
     ),
   },
 ]);
+const visibleGroups = computed(() =>
+  groups.value.filter(
+    group => props.section === 'all' || props.section === group.id
+  )
+);
+const showContext = computed(() => ['all', 'context'].includes(props.section));
 const phases = ['inicio', 'meio', 'fim'];
 </script>
 
 <template>
   <section class="mb-6 min-w-0 space-y-5" data-testid="emotional-profile">
-    <template v-if="[2, 3, 4].includes(profile?.versao)">
+    <template v-if="[2, 3, 4, 5].includes(profile?.versao)">
       <header>
         <h3 class="text-base font-bold text-n-slate-12">
           {{ tr(separateRoles ? 'SERVICE_TITLE' : 'TITLE') }}
@@ -91,7 +101,7 @@ const phases = ['inicio', 'meio', 'fim'];
           {{ tr('SIGNAL_RULES') }}
         </p>
       </header>
-      <template v-if="separateRoles">
+      <template v-if="separateRoles && section !== 'context'">
         <p
           class="rounded-xl bg-n-blue-2 p-4 text-sm leading-relaxed text-n-blue-11"
         >
@@ -108,12 +118,8 @@ const phases = ['inicio', 'meio', 'fim'];
             type="button"
             role="tab"
             :aria-selected="activeRole === role"
-            class="rounded-lg border px-4 py-2 text-sm font-semibold"
-            :class="
-              activeRole === role
-                ? 'border-n-brand bg-n-brand text-white'
-                : 'border-n-weak bg-n-solid-1 text-n-slate-11'
-            "
+            class="rounded-lg border px-4 py-2 text-sm font-semibold hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-n-slate-12 focus-visible:outline-offset-4 dark:hover:brightness-110"
+            :class="recordingTabClasses(role, activeRole === role)"
             @click="activeRole = role"
           >
             {{ tr(`ROLES.${role}`) }}
@@ -126,7 +132,7 @@ const phases = ['inicio', 'meio', 'fim'];
           {{ actor.justificativa_identificacao }}
         </p>
       </template>
-      <section v-for="group in groups" :key="group.id">
+      <section v-for="group in visibleGroups" :key="group.id">
         <h3 class="mb-3 text-sm font-semibold text-n-slate-12">
           {{ group.title }}
         </h3>
@@ -143,6 +149,7 @@ const phases = ['inicio', 'meio', 'fim'];
         </div>
       </section>
       <p
+        v-if="section === 'all' || section === 'positivos'"
         class="rounded-xl bg-n-blue-2 p-4 text-xs leading-relaxed text-n-blue-11"
       >
         {{ tr(separateRoles ? 'SERVICE_VOCAL_NOTICE' : 'VOCAL_NOTICE') }}
@@ -153,7 +160,7 @@ const phases = ['inicio', 'meio', 'fim'];
         }}</span>
         {{ result.analise_vocal?.limitacoes }}
       </p>
-      <section class="rounded-xl border border-n-weak p-4">
+      <section v-if="showContext" class="rounded-xl border border-n-weak p-4">
         <h3 class="text-sm font-semibold">{{ tr('RESOLUTION') }}</h3>
         <p
           v-if="separateRoles"
@@ -177,7 +184,7 @@ const phases = ['inicio', 'meio', 'fim'];
           </li>
         </ul>
       </section>
-      <section class="rounded-xl border border-n-weak p-4">
+      <section v-if="showContext" class="rounded-xl border border-n-weak p-4">
         <h3 class="text-sm font-semibold">{{ tr('EVOLUTION') }}</h3>
         <p class="mt-2 font-bold text-n-blue-11">
           {{ tr(`CHANGES.${profile.evolucao.resultado}`) }}

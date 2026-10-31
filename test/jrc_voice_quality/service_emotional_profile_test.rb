@@ -157,7 +157,7 @@ class ServiceEmotionalProfileTest < Minitest::Test
 
   def test_new_recording_schema_preserves_the_separate_pabx_contract
     client = JrcVoiceQuality::MonitoringClient.new(account: nil)
-    assert_equal [4], client.send(:analysis_schema).dig(:properties, :perfil_emocional, :properties, :versao, :enum)
+    assert_equal [5], client.send(:analysis_schema).dig(:properties, :perfil_emocional, :properties, :versao, :enum)
     refute JrcVoiceQuality::OpenaiClient.new(account: nil).send(:analysis_schema)[:properties].key?(:perfil_emocional)
     assert_includes Profile.instructions, 'Nao transfira a agressividade do cliente'
     assert_includes Profile.instructions, 'dependencia de terceiros'
@@ -287,4 +287,68 @@ class ServiceEmotionalProfileTest < Minitest::Test
     refute_includes requests[0]['messages'].first['content'], 'Bom dia, vou ajudar.'
     refute_includes requests[1]['messages'].last['content'], 'Atribuicao contextual pelo audio'
   end
+
+  def test_audio_limitation_excludes_the_smile_without_assigning_zero_or_changing_other_scores
+    @voice['versao'] = JrcVoiceQuality::VocalClient::VERSION
+    @voice['atendente']['sorriso_na_voz'] = {
+      'nota' => nil, 'confianca' => 'insuficiente', 'evidencias' => [],
+      'observacao' => 'Nao avaliavel por limitacao do audio: voz abafada.'
+    }
+    @voice['limitacoes'] = 'Voz abafada impede avaliar a expressao vocal do atendente.'
+    client = JrcVoiceQuality::VocalClient.new(account: nil)
+    client.send(:validate!, @voice.except('versao'), transcript: @transcript)
+    assert_equal true, Profile.speaker_context(@voice, transcript: @transcript).dig('atendente', 'identificado')
+    score = JrcVoiceQuality::OverallScore.new(@result).call
+    smile = score['grupos'].flat_map { |group| group['indicadores'] }.find do |item|
+      item['papel'] == 'atendente' && item['indicador'] == 'sorriso_na_voz'
+    end
+    assert_nil smile['nota']
+    assert_equal true, score['parcial']
+    assert_equal 100, score['nota']
+    assert_operator score['peso_avaliado'], :<, 100
+    assert_equal [5], Profile.schema.dig(:properties, :versao, :enum)
+  end
+
+  def test_human_weighting_moves_existing_weight_and_is_idempotent
+    assessment = JrcVoiceQuality::OverallScore::HUMAN_CRITERIA.index_with { 10 }
+    @result['avaliacao_atendente'] = assessment.merge('experiencia_cliente' => 0, 'resolucao_problema' => 15, 'nota_final' => 85)
+    before = @result.deep_dup
+    score = JrcVoiceQuality::OverallScore.new(@result).call
+    assert_equal 93, score['nota']
+    assert_equal 2, score.dig('ponderacao_humana', 'impacto_nota')
+    assert_equal 60, score['grupos'].find { |group| group['id'] == 'qualidade' }['peso']
+    assert_equal 100, score['peso_total']
+    assert_equal before, @result
+    once = JrcVoiceQuality::OverallScore.apply(@result)
+    assert_equal once, JrcVoiceQuality::OverallScore.apply(once)
+    legacy = @result.deep_dup
+    legacy['perfil_emocional']['versao'] = 4
+    assert_equal 91, JrcVoiceQuality::OverallScore.new(legacy).call['nota']
+    assert_nil JrcVoiceQuality::OverallScore.new(legacy).call['ponderacao_humana']
+  end
+
+  def test_partial_coverage_does_not_amplify_the_two_point_redistribution
+    assessment = JrcVoiceQuality::OverallScore::HUMAN_CRITERIA.index_with { 10 }
+    @result['avaliacao_atendente'] = assessment.merge('experiencia_cliente' => 0, 'resolucao_problema' => 15, 'nota_final' => 85)
+    @profile['atendente']['positivos'].each_value { |metric| metric['nota'] = nil }
+    score = JrcVoiceQuality::OverallScore.new(@result).call
+    assert_equal true, score['parcial']
+    assert_equal 2, score.dig('ponderacao_humana', 'impacto_nota')
+    assert_operator score.dig('ponderacao_humana', 'peso_transferido'), :<, 2
+  end
+
+  def test_weight_redistribution_is_not_a_guaranteed_bonus_and_does_not_fill_missing_grades
+    assessment = JrcVoiceQuality::OverallScore::HUMAN_CRITERIA.index_with { 0 }
+    @result['avaliacao_atendente'] = assessment.merge('experiencia_cliente' => 15, 'resolucao_problema' => 15, 'nota_final' => 30)
+    score = JrcVoiceQuality::OverallScore.new(@result).call
+    assert_equal(-2, score.dig('ponderacao_humana', 'impacto_nota'))
+    assert_equal 56, score['nota']
+    @result['avaliacao_atendente']['empatia'] = nil
+    assert_nil JrcVoiceQuality::OverallScore.new(@result).call['ponderacao_humana']
+    @result['avaliacao_atendente'] = { 'nota_final' => nil }
+    score = JrcVoiceQuality::OverallScore.new(@result).call
+    assert_nil score['ponderacao_humana']
+    assert_nil score['grupos'].first['indicadores'].first['nota']
+  end
+
 end

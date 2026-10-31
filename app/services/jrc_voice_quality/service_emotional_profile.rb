@@ -1,5 +1,5 @@
 class JrcVoiceQuality::ServiceEmotionalProfile < JrcVoiceQuality::EmotionalProfile
-  VERSION = 4
+  VERSION = 5
   ROLES = { 'atendente' => 0.8, 'cliente' => 0.2 }.freeze
   POSITIVE_WEIGHTS = { 'satisfacao' => 10, 'confianca' => 9, 'encantamento' => 8, 'atendimento_acolhedor' => 8,
                        'compreensao' => 7, 'alivio' => 6, 'sorriso_na_voz' => 5 }.freeze
@@ -16,7 +16,7 @@ class JrcVoiceQuality::ServiceEmotionalProfile < JrcVoiceQuality::EmotionalProfi
   end
 
   def self.speaker_context(vocal, transcript:)
-    return {} unless vocal.is_a?(Hash) && vocal['versao'] == 3
+    return {} unless vocal.is_a?(Hash) && [3, 4].include?(vocal['versao'])
 
     ROLES.keys.filter_map do |role|
       actor = vocal[role]
@@ -94,6 +94,15 @@ class JrcVoiceQuality::ServiceEmotionalProfile < JrcVoiceQuality::EmotionalProfi
       No atendente, satisfacao corresponde ao cuidado demonstrado com a experiencia do cliente; confianca a seguranca na orientacao;
       encantamento a iniciativas que superam expectativas; atendimento_acolhedor a empatia, cordialidade e respeito;
       compreensao a escuta e entendimento da necessidade; alivio a conducao capaz de reduzir tensao, quando comprovada.
+      Valorize conexao e acolhimento: nome do cliente usado naturalmente, escuta, atencao e personalizacao.
+      Nao citar o nome, isoladamente, NAO gera desconto; o nome pode nao estar disponivel.
+      Valorize atendimento tranquilo, paciente e seguro: respeitar o tempo do cliente, explicar com clareza e firmeza,
+      reconhecer duvidas e orientar proximos passos, sem inventar respostas ou prometer o que nao controla.
+      Registre essas condutas nos criterios existentes, sem criar bonus, descontos ou pesos extras pela mesma evidencia.
+      Ruido, volume baixo, compressao, voz abafada ou falhas da gravacao NAO sao falhas do atendimento e NAO reduzem notas.
+      Diferencie clareza da explicacao de nitidez tecnica do som. Nunca deduza impaciencia ou inseguranca de audio ruim.
+      Se a limitacao impedir avaliar um indicador, use nota null e confianca insuficiente, sem inventar nota zero;
+      explique "Nao avaliavel por limitacao do audio" na observacao e nas limitacoes quando essa for a causa.
       No cliente, avalie a percepcao e a maneira de interagir com o atendente: satisfacao, confianca, encantamento,
       atendimento_acolhedor como receptividade e respeito, compreensao das orientacoes e alivio observavel.
       Negativos de cada papel: frustracao, decepcao, inseguranca, ansiedade e agressividade, de 0 a 10 independentemente.

@@ -3,6 +3,8 @@ import { createI18n } from 'vue-i18n';
 import en from 'dashboard/i18n/locale/en/jrcContactCenter.json';
 import EmotionalProfile from '../EmotionalProfile.vue';
 import ScoreBreakdown from '../ScoreBreakdown.vue';
+import AudioAuditResult from '../AudioAuditResult.vue';
+import RecordingSignalBadge from '../RecordingSignalBadge.vue';
 
 const positive = [
   'satisfacao',
@@ -348,4 +350,158 @@ it('shows an identical finding reported on both sides only once for review inste
     wrapper.get('[data-testid=score-findings-conflicts]').text()
   ).toContain('Achado contraditório.');
   expect(wrapper.text().match(/Achado contraditório\./g)).toHaveLength(1);
+});
+
+it('renders the updated guidance profile with separate agent and customer indicators', () => {
+  const data = result();
+  data.perfil_emocional.versao = 5;
+  data.analise_vocal.versao = 4;
+  const wrapper = mount(EmotionalProfile, {
+    props: { result: data },
+    global: globalOptions(),
+  });
+  expect(wrapper.get('[role=tab][aria-selected=true]').text()).toBe(
+    'Atendente · 80%'
+  );
+  expect(wrapper.findAll('[data-testid=emotion-metric]')).toHaveLength(12);
+  expect(wrapper.text()).toContain('JUSTIFICATIVA AGENTE');
+  expect(wrapper.text()).not.toContain('JUSTIFICATIVA CLIENTE');
+});
+
+it('explains the human weight transfer without creating a second scored indicator', () => {
+  const score = {
+    versao: 2,
+    nota: 82,
+    peso_avaliado: 100,
+    parcial: false,
+    grupos: [],
+    ponderacao_humana: { impacto_nota: 2, pontos_antes: 48, pontos_depois: 50 },
+  };
+  const wrapper = mount(ScoreBreakdown, {
+    props: { score },
+    global: globalOptions(),
+  });
+  expect(wrapper.get('[data-testid=human-weighting]').text()).toContain(
+    '48 → 50'
+  );
+  expect(wrapper.get('[data-testid=human-weighting]').text()).toContain(
+    'limitado a ±2'
+  );
+  expect(score.grupos).toHaveLength(0);
+});
+
+it('opens the overview first and places long score and emotional details in their own tabs', async () => {
+  const wrapper = mount(AudioAuditResult, {
+    props: {
+      audit: {
+        id: 1,
+        account_id: 1,
+        filename: 'sample.wav',
+        transcript: 'TRANSCRICAO SALVA',
+        result: result(),
+      },
+    },
+    global: { ...globalOptions(), stubs: { Icon: true } },
+  });
+  expect(wrapper.get('[data-testid=audit-tab-header]').classes()).toContain(
+    'sticky'
+  );
+  expect(wrapper.findAll('[role=tab]')).toHaveLength(8);
+  expect(wrapper.find('[data-testid=emotional-profile]').exists()).toBe(false);
+  expect(wrapper.find('[data-testid=general-score-breakdown]').exists()).toBe(
+    false
+  );
+  await wrapper.get('#audit-tab-positive').trigger('click');
+  expect(wrapper.findAll('[data-testid=emotion-metric]')).toHaveLength(7);
+  expect(wrapper.text()).toContain('JUSTIFICATIVA AGENTE');
+  expect(wrapper.text()).not.toContain('Resolução objetiva');
+  const roles = wrapper.findAll('[role=tablist]')[1];
+  await roles.findAll('[role=tab]')[1].trigger('click');
+  await wrapper.get('#audit-tab-negative').trigger('click');
+  expect(wrapper.findAll('[data-testid=emotion-metric]')).toHaveLength(5);
+  expect(wrapper.text()).toContain('JUSTIFICATIVA CLIENTE');
+  expect(wrapper.text()).not.toContain('JUSTIFICATIVA AGENTE');
+  await wrapper.get('#audit-tab-context').trigger('click');
+  expect(wrapper.findAll('[data-testid=emotion-metric]')).toHaveLength(0);
+  expect(wrapper.text()).toContain('Depende de uma etapa externa.');
+  await wrapper.get('#audit-tab-transcript').trigger('click');
+  expect(wrapper.get('[role=tabpanel]').text()).toBe('TRANSCRICAO SALVA');
+});
+
+it('keeps the selected report tab on data refresh and resets it on account or recording change', async () => {
+  const audit = {
+    id: 1,
+    account_id: 1,
+    filename: 'sample.wav',
+    result: result(),
+  };
+  const wrapper = mount(AudioAuditResult, {
+    props: { audit },
+    global: { ...globalOptions(), stubs: { Icon: true } },
+  });
+  await wrapper.get('#audit-tab-negative').trigger('click');
+  await wrapper.setProps({ audit: { ...audit, result: result() } });
+  expect(wrapper.get('#audit-tab-negative').attributes('aria-selected')).toBe(
+    'true'
+  );
+  await wrapper.setProps({ audit: { ...audit, account_id: 2 } });
+  expect(wrapper.get('#audit-tab-summary').attributes('aria-selected')).toBe(
+    'true'
+  );
+  await wrapper.get('#audit-tab-positive').trigger('click');
+  await wrapper.setProps({ audit: { ...audit, id: 2 } });
+  expect(wrapper.get('#audit-tab-summary').attributes('aria-selected')).toBe(
+    'true'
+  );
+});
+
+it('supports keyboard tab navigation and preserves audio and JSON actions', async () => {
+  const wrapper = mount(AudioAuditResult, {
+    props: { audit: { id: 1, filename: 'sample.wav', result: result() } },
+    attachTo: document.body,
+    global: { ...globalOptions(), stubs: { Icon: true } },
+  });
+  await wrapper
+    .get('#audit-tab-summary')
+    .trigger('keydown', { key: 'ArrowRight' });
+  expect(wrapper.get('#audit-tab-score').attributes('aria-selected')).toBe(
+    'true'
+  );
+  expect(document.activeElement.id).toBe('audit-tab-score');
+  await wrapper.get('#audit-tab-score').trigger('keydown', { key: 'End' });
+  expect(wrapper.get('#audit-tab-transcript').attributes('tabindex')).toBe('0');
+  await wrapper
+    .get('#audit-tab-transcript')
+    .trigger('keydown', { key: 'Home' });
+  expect(wrapper.get('#audit-tab-summary').attributes('tabindex')).toBe('0');
+  await wrapper
+    .findAll('button')
+    .find(button => button.text() === 'Ouvir gravação')
+    .trigger('click');
+  await wrapper
+    .findAll('button')
+    .find(button => button.text() === 'Baixar relatório JSON')
+    .trigger('click');
+  expect(wrapper.emitted('play')).toHaveLength(1);
+  expect(wrapper.emitted('download')).toHaveLength(1);
+  wrapper.unmount();
+});
+
+it('shows an explicit missing signal instead of inventing a sentiment or a supervision alert', async () => {
+  const wrapper = mount(RecordingSignalBadge, {
+    props: { kind: 'alert', value: null },
+    global: { ...globalOptions(), stubs: { Icon: true } },
+  });
+  expect(wrapper.text()).toBe('—');
+  await wrapper.setProps({ value: false });
+  expect(wrapper.text()).toBe('Não');
+  await wrapper.setProps({ value: true });
+  expect(wrapper.text()).toBe('Sim');
+  expect(wrapper.classes()).toContain('text-rose-900');
+  await wrapper.setProps({ kind: 'sentiment', value: 'positivo' });
+  expect(wrapper.text()).toBe('Positivo');
+  expect(wrapper.classes()).toContain('text-emerald-800');
+  await wrapper.setProps({ value: 'nao_identificado' });
+  expect(wrapper.text()).toBe('Não identificado');
+  expect(wrapper.classes()).toContain('text-n-slate-11');
 });

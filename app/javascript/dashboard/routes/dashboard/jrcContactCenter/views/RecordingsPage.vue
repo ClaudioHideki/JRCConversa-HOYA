@@ -7,6 +7,8 @@ import AudioAuditsAPI from 'dashboard/api/audioAudits';
 import AudioAuditResult from '../components/AudioAuditResult.vue';
 import AudioAuditDialog from '../components/AudioAuditDialog.vue';
 import ClassificationBadge from '../components/ClassificationBadge.vue';
+import RecordingSignalBadge from '../components/RecordingSignalBadge.vue';
+import { recordingTabClasses } from '../components/recordingTabClasses';
 
 const route = useRoute();
 const { t, tm } = useI18n();
@@ -38,10 +40,10 @@ const reportVisible = ref(false);
 const historySection = ref(null);
 let generation = 0;
 let timer;
+let listRequest = 0;
+let fetching = false;
 let selecting = 0;
-const label = value =>
-  tm('JRC_CONTACT_CENTER.RECORDINGS.VALUES')[value] || value || '—';
-const date = value => new Date(value).toLocaleString();
+const date = value => new Date(value).toLocaleDateString();
 const busy = status => ['queued', 'processing'].includes(status);
 const recordingLabels = computed(() => tm('JRC_CONTACT_CENTER.RECORDINGS'));
 const emptyHistoryMessage = computed(() => {
@@ -164,13 +166,16 @@ const openAudit = async id => {
     if (current === generation && request === selecting) opening.value = false;
   }
 };
-const refresh = async () => {
-  if (loading.value) return;
+const refresh = async ({ silent = false } = {}) => {
+  if (fetching) return;
   const current = generation;
-  loading.value = true;
+  listRequest += 1;
+  const listId = listRequest;
+  fetching = true;
+  if (!silent) loading.value = true;
   try {
     const { data } = await AudioAuditsAPI.list(page.value, filter.value);
-    if (current !== generation) return;
+    if (current !== generation || listId !== listRequest) return;
     items.value = data.items;
     metrics.value = data.metrics;
     total.value = data.total;
@@ -188,9 +193,12 @@ const refresh = async () => {
         selected.value = response.data.item;
     }
   } catch (exception) {
-    if (current === generation) setError(exception);
+    if (current === generation && listId === listRequest) setError(exception);
   } finally {
-    if (current === generation) loading.value = false;
+    if (current === generation && listId === listRequest) {
+      fetching = false;
+      loading.value = false;
+    }
   }
 };
 const chooseFiles = files => {
@@ -306,6 +314,8 @@ const download = () => {
 };
 const changePage = async offset => {
   if (loading.value) return;
+  listRequest += 1;
+  fetching = false;
   page.value += offset;
   await refresh();
 };
@@ -314,6 +324,8 @@ const selectFilter = async value => {
   if (value !== filter.value) {
     selecting += 1;
     reportDialog.value?.close();
+    listRequest += 1;
+    fetching = false;
     filter.value = value;
     page.value = 1;
     items.value = [];
@@ -327,6 +339,8 @@ watch(
   () => route.params.accountId,
   () => {
     generation += 1;
+    listRequest += 1;
+    fetching = false;
     selecting += 1;
     reportDialog.value?.close();
     reportVisible.value = false;
@@ -347,7 +361,7 @@ watch(
     opening.value = false;
     if (fileInput.value) fileInput.value.value = '';
     refresh();
-    timer = setInterval(refresh, 5000);
+    timer = setInterval(() => refresh({ silent: true }), 5000);
   },
   { immediate: true }
 );
@@ -428,7 +442,7 @@ onUnmounted(() => {
       }}</span>
     </p>
     <div
-      class="grid min-w-0 gap-5 2xl:grid-cols-[minmax(260px,1fr)_minmax(0,2fr)]"
+      class="grid min-w-0 items-start gap-5 2xl:grid-cols-[minmax(250px,1fr)_minmax(0,2.4fr)]"
     >
       <section
         class="min-w-0 rounded-2xl border border-n-weak bg-n-solid-1 p-5 shadow-sm"
@@ -547,6 +561,18 @@ onUnmounted(() => {
                 })
           }}
         </button>
+        <aside
+          class="mt-4 rounded-xl border border-n-blue-5 bg-n-blue-1 p-3 text-xs text-n-blue-11"
+        >
+          <h3 class="flex items-center gap-2 font-semibold">
+            <Icon icon="i-lucide-info" class="size-4" />{{
+              t('JRC_CONTACT_CENTER.RECORDINGS.HOW_IT_WORKS')
+            }}
+          </h3>
+          <p class="mt-2 leading-relaxed">
+            {{ t('JRC_CONTACT_CENTER.RECORDINGS.HOW_IT_WORKS_DESCRIPTION') }}
+          </p>
+        </aside>
       </section>
       <section
         ref="historySection"
@@ -576,12 +602,8 @@ onUnmounted(() => {
             :data-testid="`recording-filter-${option.id}`"
             :aria-pressed="filter === option.id"
             :disabled="loading"
-            class="rounded-full border px-3 py-2 text-xs font-semibold disabled:opacity-50"
-            :class="
-              filter === option.id
-                ? 'border-n-blue-9 bg-n-blue-9 text-white'
-                : 'border-n-weak bg-n-solid-1 text-n-slate-11 hover:bg-n-alpha-2'
-            "
+            class="rounded-full border px-3 py-2 text-xs font-semibold hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-n-slate-12 focus-visible:outline-offset-4 disabled:opacity-50 dark:hover:brightness-110"
+            :class="recordingTabClasses(option.id, filter === option.id)"
             @click="selectFilter(option.id)"
           >
             {{ option.label }}
@@ -592,32 +614,35 @@ onUnmounted(() => {
             t('JRC_CONTACT_CENTER.RECORDINGS.FILTER_NOTICE', { count: perPage })
           }}
         </p>
-        <div class="min-w-0 flex-1 overflow-x-auto">
-          <table class="w-full text-left text-xs">
+        <div
+          class="min-w-0 flex-1 overflow-x-auto"
+          data-testid="recording-history-table"
+        >
+          <table class="w-full min-w-[850px] table-fixed text-left text-xs">
             <thead class="bg-n-solid-2 text-n-slate-10">
               <tr>
-                <th class="p-3">
+                <th class="w-28 px-3 py-2">
                   {{ t('JRC_CONTACT_CENTER.RECORDINGS.DATE') }}
                 </th>
-                <th class="p-3">
+                <th class="w-40 px-3 py-2">
                   {{ t('JRC_CONTACT_CENTER.RECORDINGS.FILE') }}
                 </th>
-                <th class="p-3">
+                <th class="w-24 px-3 py-2">
                   {{ t('JRC_CONTACT_CENTER.RECORDINGS.TEMPERATURE') }}
                 </th>
-                <th class="p-3">
+                <th class="w-24 px-3 py-2">
                   {{ t('JRC_CONTACT_CENTER.RECORDINGS.SENTIMENT') }}
                 </th>
-                <th class="p-3">
+                <th class="w-20 px-3 py-2">
                   {{ t('JRC_CONTACT_CENTER.RECORDINGS.SCORE') }}
                 </th>
-                <th class="p-3">
+                <th class="w-24 px-3 py-2">
                   {{ t('JRC_CONTACT_CENTER.RECORDINGS.CLASSIFICATION') }}
                 </th>
-                <th class="p-3">
+                <th class="w-28 px-3 py-2">
                   {{ t('JRC_CONTACT_CENTER.RECORDINGS.STATUS') }}
                 </th>
-                <th class="p-3">
+                <th class="w-20 px-3 py-2">
                   {{ t('JRC_CONTACT_CENTER.RECORDINGS.ALERT') }}
                 </th>
               </tr>
@@ -629,7 +654,10 @@ onUnmounted(() => {
                 :class="selected?.id === item.id ? 'bg-n-blue-1' : ''"
               >
                 <td class="whitespace-nowrap p-3">
-                  {{ date(item.created_at) }}
+                  <p>{{ date(item.created_at) }}</p>
+                  <p class="mt-1 text-[10px] text-n-slate-10">
+                    {{ new Date(item.created_at).toLocaleTimeString() }}
+                  </p>
                 </td>
                 <td class="min-w-32 max-w-56 break-all p-3">
                   <button
@@ -641,8 +669,18 @@ onUnmounted(() => {
                     {{ item.filename }}
                   </button>
                 </td>
-                <td class="p-3">{{ label(item.temperatura_conversa) }}</td>
-                <td class="p-3">{{ label(item.sentimento_cliente) }}</td>
+                <td class="p-3">
+                  <RecordingSignalBadge
+                    kind="temperature"
+                    :value="item.temperatura_conversa"
+                  />
+                </td>
+                <td class="p-3">
+                  <RecordingSignalBadge
+                    kind="sentiment"
+                    :value="item.sentimento_cliente"
+                  />
+                </td>
                 <td class="p-3 font-bold">
                   {{ item.nota_final ?? '—' }}
                   <p
@@ -662,15 +700,7 @@ onUnmounted(() => {
                   <ClassificationBadge :value="item.classificacao_ligacao" />
                 </td>
                 <td class="p-3">
-                  <p
-                    :class="
-                      item.status === 'failed'
-                        ? 'text-red-600'
-                        : 'text-n-slate-11'
-                    "
-                  >
-                    {{ label(item.status) }}
-                  </p>
+                  <RecordingSignalBadge kind="status" :value="item.status" />
                   <button
                     v-if="item.status === 'failed'"
                     type="button"
@@ -682,13 +712,10 @@ onUnmounted(() => {
                   </button>
                 </td>
                 <td class="p-3">
-                  {{
-                    label(
-                      item.alerta_supervisao === undefined
-                        ? null
-                        : String(item.alerta_supervisao)
-                    )
-                  }}
+                  <RecordingSignalBadge
+                    kind="alert"
+                    :value="item.alerta_supervisao"
+                  />
                 </td>
               </tr>
               <tr v-if="!items.length">
@@ -730,9 +757,6 @@ onUnmounted(() => {
     <AudioAuditDialog ref="reportDialog" @close="closeReport">
       <p v-if="opening" role="status" class="text-sm text-n-slate-10">
         {{ t('JRC_CONTACT_CENTER.COMMON.LOADING') }}
-      </p>
-      <p v-if="selected" class="mb-4 break-all text-xs text-n-slate-10">
-        {{ selected.filename }}
       </p>
       <p
         v-if="error"

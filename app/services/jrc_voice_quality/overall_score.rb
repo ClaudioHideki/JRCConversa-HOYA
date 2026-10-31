@@ -1,5 +1,7 @@
 class JrcVoiceQuality::OverallScore
   WEIGHTS = { 'qualidade' => 60, 'positivos' => 15, 'negativos' => 10, 'resolucao' => 10, 'evolucao' => 5 }.freeze
+  HUMAN_CRITERIA = %w[cordialidade empatia clareza_comunicacao dominio_assunto conducao_conversa cumprimento_protocolo controle_emocional].freeze
+  HUMAN_REALLOCATION = 2.0
   RESOLUTION = { 'resolvido' => 10, 'parcialmente_resolvido' => 6, 'encaminhado' => 4, 'nao_resolvido' => 0 }.freeze
   EVOLUTION = { 'melhorou' => 10, 'estavel' => 5, 'mista' => 5, 'piorou' => 0 }.freeze
 
@@ -13,6 +15,7 @@ class JrcVoiceQuality::OverallScore
     items = groups.flat_map { |group| group['indicadores'] }
     evaluated = items.reject { |item| item['nota'].nil? }
     weight = evaluated.sum { |item| item['peso'] }.round(8)
+    human_weighting = redistribute_quality!(groups, weight)
     points = evaluated.sum { |item| item['pontos'] }.round(2)
     {
       'versao' => service_profile? ? 2 : 1, 'nota' => weight.positive? ? (points * 100 / weight).round(2).clamp(0, 100) : nil,
@@ -20,7 +23,8 @@ class JrcVoiceQuality::OverallScore
       'grupos' => groups,
       'mais_contribuiram' => ranked(evaluated, 'pontos'),
       'mais_reduziram' => ranked(evaluated, 'pontos_perdidos'),
-      'proporcao_papeis' => service_profile? ? JrcVoiceQuality::ServiceEmotionalProfile::ROLES : nil
+      'proporcao_papeis' => service_profile? ? JrcVoiceQuality::ServiceEmotionalProfile::ROLES : nil,
+      'ponderacao_humana' => human_weighting
     }
   end
 
@@ -51,7 +55,7 @@ class JrcVoiceQuality::OverallScore
   private
 
   def service_profile?
-    [3, 4].include?(@profile['versao'])
+    [3, 4, 5].include?(@profile['versao'])
   end
 
   def build_groups
@@ -96,6 +100,33 @@ class JrcVoiceQuality::OverallScore
     metric = { 'nota' => @result.dig('avaliacao_atendente', 'nota_final'),
                'observacao' => @result['justificativa_nota'], 'evidencias' => Array(@result['trechos_relevantes']).grep(String) }
     item('qualidade', 'qualidade', metric, scale: 100)
+  end
+
+  def redistribute_quality!(groups, coverage)
+    return unless @profile['versao'] == 5
+
+    assessment = @result['avaliacao_atendente'] || {}
+    quality = groups.find { |group| group['id'] == 'qualidade' }
+    row = quality['indicadores'].first
+    grades = assessment.values_at(*HUMAN_CRITERIA)
+    experience = assessment['experiencia_cliente']
+    return if row['nota'].nil? || !experience.is_a?(Numeric) || grades.any? { |grade| !grade.is_a?(Numeric) }
+
+    # Move existing weight, never add a second reward. Scale by coverage so a partial
+    # report cannot amplify the change beyond two points in the proportional grade.
+    human = grades.sum / (10.0 * HUMAN_CRITERIA.size)
+    transferred = HUMAN_REALLOCATION * coverage / 100
+    delta = transferred * (human - experience / 15.0)
+    before = row['pontos']
+    row['pontos'] = (before + delta).clamp(0, row['peso']).round(10)
+    row['nota'] = row['pontos'] * 100 / row['peso']
+    row['pontos_perdidos'] = row['peso'] - row['pontos']
+    quality['pontos'] = row['pontos'].round(2)
+    {
+      'versao' => 1, 'criterios' => HUMAN_CRITERIA, 'origem' => 'experiencia_cliente',
+      'peso_transferido' => transferred, 'pontos_antes' => before, 'pontos_depois' => row['pontos'],
+      'impacto_nota' => coverage.positive? ? ((row['pontos'] - before) * 100 / coverage).round(2) : 0
+    }
   end
 
   def metric_items(names, metrics, group)
