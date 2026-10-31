@@ -17,6 +17,27 @@ class JrcVoiceQuality::AudioAudit < ApplicationRecord
   validate :valid_audio, on: :create
 
   scope :completed, -> { where(status: 'completed') }
+  scope :current_scores, -> { completed.where("result->'pontuacao_geral'->>'versao' = '2' AND jsonb_typeof(result->'nota_final') = 'number'") }
+  scope :scored, -> { current_scores.where("result->'pontuacao_geral'->>'parcial' = 'false'") }
+  scope :supervision_alerts, -> { completed.where("result->>'alerta_supervisao' = 'true'") }
+  scope :critical_calls, -> { completed.where("result->>'classificacao_ligacao' = 'critica'") }
+  scope :hot_conversations, -> { completed.where("result->>'temperatura_conversa' IN ('quente', 'critica')") }
+  scope :churn_risk, -> { completed.where("result->>'risco_churn' IN ('alto', 'critico')") }
+
+  HISTORY_FILTERS = %w[all audited scored alerts critical hot churn].freeze
+
+  def self.for_history(filter)
+    case filter
+    when 'all' then all
+    when 'audited' then completed
+    when 'scored' then scored
+    when 'alerts' then supervision_alerts
+    when 'critical' then critical_calls
+    when 'hot' then hot_conversations
+    when 'churn' then churn_risk
+    else raise ArgumentError, 'Unknown recording filter'
+    end
+  end
 
   def refreshable_partial?
     status == 'completed' && result.dig('pontuacao_geral', 'parcial') == true &&
@@ -43,14 +64,16 @@ class JrcVoiceQuality::AudioAudit < ApplicationRecord
   def self.metrics
     done = completed
     total = done.count
-    scored = done.where("result->'pontuacao_geral'->>'versao' = '2' AND result->'pontuacao_geral'->>'parcial' = 'false'")
+    scores = scored
     {
       total: total,
-      average_score: scored.average(Arel.sql("(result->>'nota_final')::numeric"))&.round(2)&.to_f,
-      alerts: done.where("result->>'alerta_supervisao' = 'true'").count,
-      critical: done.where("result->>'classificacao_ligacao' = 'critica'").count,
-      hot: done.where("result->>'temperatura_conversa' IN ('quente', 'critica')").count,
-      churn_percent: total.zero? ? nil : (100.0 * done.where("result->>'risco_churn' IN ('alto', 'critico')").count / total).round(1)
+      average_score: scores.average(Arel.sql("(result->>'nota_final')::numeric"))&.round(2)&.to_f,
+      average_count: scores.count,
+      partial_count: current_scores.where("result->'pontuacao_geral'->>'parcial' = 'true'").count,
+      alerts: supervision_alerts.count,
+      critical: critical_calls.count,
+      hot: hot_conversations.count,
+      churn_percent: total.zero? ? nil : (100.0 * churn_risk.count / total).round(1)
     }
   end
 

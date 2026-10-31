@@ -39,8 +39,16 @@ const oldClose = Object.getOwnPropertyDescriptor(
   HTMLDialogElement.prototype,
   'close'
 );
+const oldScroll = Object.getOwnPropertyDescriptor(
+  Element.prototype,
+  'scrollIntoView'
+);
 
 beforeAll(() => {
+  Object.defineProperty(Element.prototype, 'scrollIntoView', {
+    configurable: true,
+    value: vi.fn(),
+  });
   Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
     configurable: true,
     value() {
@@ -57,6 +65,9 @@ beforeAll(() => {
   });
 });
 afterAll(() => {
+  if (oldScroll)
+    Object.defineProperty(Element.prototype, 'scrollIntoView', oldScroll);
+  else delete Element.prototype.scrollIntoView;
   if (oldShow)
     Object.defineProperty(HTMLDialogElement.prototype, 'showModal', oldShow);
   else delete HTMLDialogElement.prototype.showModal;
@@ -212,4 +223,199 @@ it('only refreshes an old incomplete result on an explicit click with the consum
   await refreshButton.trigger('click');
   await flushPromises();
   expect(API.retryAnalysis).toHaveBeenCalledExactlyOnceWith(1);
+});
+
+it('colors both the metric card and its inherited number and keeps every card actionable', () => {
+  const colors = {
+    audited: 'text-sky-800',
+    scored: 'text-emerald-800',
+    alerts: 'text-amber-800',
+    critical: 'text-rose-900',
+    hot: 'text-orange-800',
+    churn: 'text-fuchsia-900',
+  };
+  Object.entries(colors).forEach(([id, color]) => {
+    const card = wrapper.get(`[data-testid=recording-metric-${id}]`);
+    expect(card.element.tagName).toBe('BUTTON');
+    expect(card.classes()).toContain(color);
+    expect(card.find('p.text-3xl').exists()).toBe(true);
+    expect(card.attributes('aria-pressed')).toBe('false');
+  });
+});
+
+it('filters alerts across pages of ten and resets the page when a different card is selected', async () => {
+  API.list.mockResolvedValueOnce({
+    data: {
+      items: Array.from({ length: 10 }, (_, i) => record(i + 10)),
+      total: 12,
+      per_page: 10,
+      metrics: { total: 23, alerts: 12 },
+      configuration: { configured: true },
+    },
+  });
+  await wrapper.get('[data-testid=recording-metric-alerts]').trigger('click');
+  await flushPromises();
+  expect(API.list).toHaveBeenLastCalledWith(1, 'alerts');
+  expect(
+    wrapper
+      .get('[data-testid=recording-filter-alerts]')
+      .attributes('aria-pressed')
+  ).toBe('true');
+  expect(wrapper.findAll('tbody tr')).toHaveLength(10);
+  expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+  API.list.mockResolvedValueOnce({
+    data: {
+      items: [record(20), record(21)],
+      total: 12,
+      per_page: 10,
+      metrics: { total: 23, alerts: 12 },
+      configuration: { configured: true },
+    },
+  });
+  await wrapper
+    .findAll('button')
+    .find(node => node.text() === 'Próxima')
+    .trigger('click');
+  await flushPromises();
+  expect(API.list).toHaveBeenLastCalledWith(2, 'alerts');
+  expect(wrapper.findAll('tbody tr')).toHaveLength(2);
+  API.list.mockResolvedValueOnce({
+    data: {
+      items: [record(30)],
+      total: 1,
+      per_page: 10,
+      metrics: { total: 23, alerts: 12, critical: 1 },
+      configuration: { configured: true },
+    },
+  });
+  await wrapper.get('[data-testid=recording-metric-critical]').trigger('click');
+  await flushPromises();
+  expect(API.list).toHaveBeenLastCalledWith(1, 'critical');
+  expect(wrapper.text()).toContain('Página 1');
+  expect(
+    wrapper
+      .get('[data-testid=recording-filter-alerts]')
+      .attributes('aria-pressed')
+  ).toBe('false');
+  expect(wrapper.findAll('tbody tr')).toHaveLength(1);
+});
+
+it('explains the missing complete-only average and lets the average card show its eligible records', async () => {
+  API.list.mockResolvedValue({
+    data: {
+      items: [],
+      total: 0,
+      per_page: 10,
+      metrics: {
+        total: 126,
+        average_score: null,
+        average_count: 0,
+        partial_count: 126,
+      },
+      configuration: { configured: true },
+    },
+  });
+  await wrapper
+    .findAll('button')
+    .find(node => node.text() === 'Atualizar histórico')
+    .trigger('click');
+  await flushPromises();
+  expect(wrapper.get('[data-testid=recording-metric-scored]').text()).toContain(
+    '—'
+  );
+  expect(wrapper.text()).toContain('Notas completas na média: 0');
+  expect(wrapper.text()).toContain('fora da média: 126');
+  expect(wrapper.text()).toContain('ainda não há notas completas elegíveis');
+  await wrapper.get('[data-testid=recording-metric-scored]').trigger('click');
+  await flushPromises();
+  expect(API.list).toHaveBeenLastCalledWith(1, 'scored');
+  expect(wrapper.get('tbody').text()).toContain(
+    'ainda não há notas completas elegíveis'
+  );
+  expect(API.retryAnalysis).not.toHaveBeenCalled();
+});
+
+it('displays a true zero average without replacing it with the missing-value dash', async () => {
+  API.list.mockResolvedValue({
+    data: {
+      items: [],
+      total: 0,
+      per_page: 10,
+      metrics: { average_score: 0, average_count: 2, partial_count: 0 },
+      configuration: { configured: true },
+    },
+  });
+  await wrapper
+    .findAll('button')
+    .find(node => node.text() === 'Atualizar histórico')
+    .trigger('click');
+  await flushPromises();
+  expect(
+    wrapper.get('[data-testid=recording-metric-scored] p.text-3xl').text()
+  ).toBe('0');
+  expect(wrapper.text()).not.toContain(
+    'ainda não há notas completas elegíveis'
+  );
+});
+
+it('resets the active filter, page and metrics when changing Accounts', async () => {
+  await wrapper.get('[data-testid=recording-metric-hot]').trigger('click');
+  await flushPromises();
+  API.list.mockResolvedValue({
+    data: {
+      items: [],
+      total: 0,
+      per_page: 10,
+      metrics: {
+        total: 0,
+        average_score: null,
+        average_count: 0,
+        partial_count: 0,
+      },
+      configuration: { configured: true },
+    },
+  });
+  state.route.params.accountId = '2';
+  await flushPromises();
+  expect(API.list).toHaveBeenLastCalledWith(1, 'all');
+  expect(
+    wrapper.get('[data-testid=recording-filter-all]').attributes('aria-pressed')
+  ).toBe('true');
+  expect(
+    wrapper.get('[data-testid=recording-metric-hot]').attributes('aria-pressed')
+  ).toBe('false');
+  expect(wrapper.text()).not.toContain('file-1.wav');
+});
+
+it('keeps the complete filename available while limiting its visible text to two lines', () => {
+  expect(fileButton(1).classes()).toContain('line-clamp-2');
+  expect(fileButton(1).attributes('title')).toBe('file-1.wav');
+});
+
+it('keeps the chosen filter when an upload finishes instead of opening a report over that view', async () => {
+  let finishUpload;
+  API.upload.mockImplementationOnce(
+    () =>
+      new Promise(resolve => {
+        finishUpload = resolve;
+      })
+  );
+  await wrapper.get('.border-dashed').trigger('drop', {
+    dataTransfer: {
+      files: [new File(['audio'], 'sample.wav', { type: 'audio/wav' })],
+    },
+  });
+  await wrapper
+    .findAll('button')
+    .find(node => node.text() === 'Analisar gravações (1)')
+    .trigger('click');
+  await flushPromises();
+  await wrapper.get('[data-testid=recording-metric-alerts]').trigger('click');
+  await flushPromises();
+  finishUpload({ data: { item: { id: 999 } } });
+  await flushPromises();
+  expect(API.upload).toHaveBeenCalledTimes(1);
+  expect(API.list).toHaveBeenLastCalledWith(1, 'alerts');
+  expect(API.show).not.toHaveBeenCalled();
+  expect(wrapper.get('dialog').element.open).toBe(false);
 });

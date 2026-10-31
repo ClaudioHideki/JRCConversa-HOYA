@@ -1,11 +1,17 @@
 class Api::V1::Accounts::JrcContactCenter::AudioAuditsController < Api::V1::Accounts::JrcContactCenter::BaseController
   before_action -> { authorize_contact_center!(:reports?) }
+  PER_PAGE = 10
 
   def index
     page = [params[:page].to_i, 1].max
-    scope = audits.order(created_at: :desc, id: :desc)
-    render json: base_payload.merge(items: scope.offset((page - 1) * 25).limit(25).map(&:summary_payload),
-                                    total: scope.count, page: page, per_page: 25, metrics: audits.metrics,
+    filter = params[:filter].presence || 'all'
+    unless JrcVoiceQuality::AudioAudit::HISTORY_FILTERS.include?(filter)
+      return render json: base_payload.merge(error: 'invalid_filter'), status: :bad_request
+    end
+
+    scope = audits.for_history(filter).order(created_at: :desc, id: :desc)
+    render json: base_payload.merge(items: scope.offset((page - 1) * PER_PAGE).limit(PER_PAGE).map(&:summary_payload),
+                                    total: scope.count, page: page, per_page: PER_PAGE, filter: filter, metrics: audits.metrics,
                                     configuration: configuration)
   end
 

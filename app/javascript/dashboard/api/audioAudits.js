@@ -6,8 +6,8 @@ class AudioAuditsAPI extends ApiClient {
     super('jrc_contact_center/audio_audits', { accountScoped: true });
   }
 
-  list(page = 1) {
-    return axios.get(this.url, { params: { page } });
+  list(page = 1, filter = 'all') {
+    return axios.get(this.url, { params: { page, filter } });
   }
 
   upload(audio) {

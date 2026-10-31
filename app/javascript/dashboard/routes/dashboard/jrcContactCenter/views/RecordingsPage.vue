@@ -15,6 +15,8 @@ const metrics = ref({});
 const configuration = ref(null);
 const total = ref(0);
 const page = ref(1);
+const perPage = ref(10);
+const filter = ref('all');
 const loading = ref(false);
 const uploading = ref(false);
 const error = ref('');
@@ -33,6 +35,7 @@ const audioUrl = ref('');
 const audioPlayer = ref(null);
 const reportDialog = ref(null);
 const reportVisible = ref(false);
+const historySection = ref(null);
 let generation = 0;
 let timer;
 let selecting = 0;
@@ -40,41 +43,86 @@ const label = value =>
   tm('JRC_CONTACT_CENTER.RECORDINGS.VALUES')[value] || value || '—';
 const date = value => new Date(value).toLocaleString();
 const busy = status => ['queued', 'processing'].includes(status);
-const cards = computed(() => [
-  [
-    t('JRC_CONTACT_CENTER.RECORDINGS.TOTAL'),
-    metrics.value.total ?? 0,
-    'i-lucide-mic',
-  ],
-  [
-    t('JRC_CONTACT_CENTER.RECORDINGS.AVERAGE'),
-    metrics.value.average_score ?? '—',
-    'i-lucide-star',
-  ],
-  [
-    t('JRC_CONTACT_CENTER.RECORDINGS.ALERTS'),
-    metrics.value.alerts ?? 0,
-    'i-lucide-triangle-alert',
-  ],
-  [
-    t('JRC_CONTACT_CENTER.RECORDINGS.CRITICAL'),
-    metrics.value.critical ?? 0,
-    'i-lucide-phone',
-  ],
-  [
-    t('JRC_CONTACT_CENTER.RECORDINGS.HOT'),
-    metrics.value.hot ?? 0,
-    'i-lucide-message-circle',
-  ],
-  [
-    t('JRC_CONTACT_CENTER.RECORDINGS.CHURN'),
-    metrics.value.churn_percent === null ||
-    metrics.value.churn_percent === undefined
-      ? '—'
-      : `${metrics.value.churn_percent}%`,
-    'i-lucide-shield-check',
-  ],
-]);
+const recordingLabels = computed(() => tm('JRC_CONTACT_CENTER.RECORDINGS'));
+const emptyHistoryMessage = computed(() => {
+  if (loading.value) return t('JRC_CONTACT_CENTER.COMMON.LOADING');
+  if (filter.value === 'all') return t('JRC_CONTACT_CENTER.RECORDINGS.EMPTY');
+  if (filter.value === 'scored' && metrics.value.average_count === 0)
+    return t('JRC_CONTACT_CENTER.RECORDINGS.AVERAGE_EMPTY');
+  return t('JRC_CONTACT_CENTER.RECORDINGS.EMPTY_FILTER');
+});
+const number = value =>
+  new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(value);
+const cardDefinitions = [
+  {
+    id: 'audited',
+    label: 'TOTAL',
+    metric: 'total',
+    icon: 'i-lucide-mic',
+    color:
+      'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-200',
+  },
+  {
+    id: 'scored',
+    label: 'AVERAGE',
+    metric: 'average_score',
+    icon: 'i-lucide-star',
+    color:
+      'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200',
+  },
+  {
+    id: 'alerts',
+    label: 'ALERTS',
+    metric: 'alerts',
+    icon: 'i-lucide-triangle-alert',
+    color:
+      'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200',
+  },
+  {
+    id: 'critical',
+    label: 'CRITICAL',
+    metric: 'critical',
+    icon: 'i-lucide-phone',
+    color:
+      'border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-200',
+  },
+  {
+    id: 'hot',
+    label: 'HOT',
+    metric: 'hot',
+    icon: 'i-lucide-message-circle',
+    color:
+      'border-orange-200 bg-orange-50 text-orange-800 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-200',
+  },
+  {
+    id: 'churn',
+    label: 'CHURN',
+    metric: 'churn_percent',
+    icon: 'i-lucide-shield-check',
+    color:
+      'border-fuchsia-200 bg-fuchsia-50 text-fuchsia-900 dark:border-fuchsia-800 dark:bg-fuchsia-950 dark:text-fuchsia-200',
+  },
+];
+const cards = computed(() =>
+  cardDefinitions.map(card => {
+    const value = metrics.value[card.metric];
+    const emptyValue = ['scored', 'churn'].includes(card.id) ? '—' : '0';
+    return {
+      ...card,
+      title: recordingLabels.value[card.label],
+      value:
+        value == null
+          ? emptyValue
+          : `${number(value)}${card.id === 'churn' ? '%' : ''}`,
+    };
+  })
+);
+const historyFilters = computed(() =>
+  ['all', ...cardDefinitions.map(card => card.id)].map(id => ({
+    id,
+    label: recordingLabels.value.FILTERS[id],
+  }))
+);
 const clearAudio = () => {
   audioPlayer.value?.pause();
   if (audioUrl.value) URL.revokeObjectURL(audioUrl.value);
@@ -121,11 +169,12 @@ const refresh = async () => {
   const current = generation;
   loading.value = true;
   try {
-    const { data } = await AudioAuditsAPI.list(page.value);
+    const { data } = await AudioAuditsAPI.list(page.value, filter.value);
     if (current !== generation) return;
     items.value = data.items;
     metrics.value = data.metrics;
     total.value = data.total;
+    perPage.value = data.per_page || 10;
     configuration.value = data.configuration;
     if (selected.value && busy(selected.value.status)) {
       const id = selected.value.id;
@@ -256,8 +305,23 @@ const download = () => {
   URL.revokeObjectURL(url);
 };
 const changePage = async offset => {
+  if (loading.value) return;
   page.value += offset;
   await refresh();
+};
+const selectFilter = async value => {
+  if (loading.value) return;
+  if (value !== filter.value) {
+    selecting += 1;
+    reportDialog.value?.close();
+    filter.value = value;
+    page.value = 1;
+    items.value = [];
+    total.value = 0;
+    error.value = '';
+    await refresh();
+  }
+  historySection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
 watch(
   () => route.params.accountId,
@@ -276,6 +340,8 @@ watch(
     error.value = '';
     total.value = 0;
     page.value = 1;
+    perPage.value = 10;
+    filter.value = 'all';
     loading.value = false;
     uploading.value = false;
     opening.value = false;
@@ -318,23 +384,48 @@ onUnmounted(() => {
       {{ t('JRC_CONTACT_CENTER.RECORDINGS.CONFIGURATION_REQUIRED') }}
     </p>
     <div class="grid grid-cols-2 gap-3 md:grid-cols-3 2xl:grid-cols-6">
-      <div
-        v-for="[title, value, icon] in cards"
-        :key="title"
-        class="min-w-0 rounded-2xl border border-n-weak bg-n-solid-1 p-4 shadow-sm"
+      <button
+        v-for="card in cards"
+        :key="card.id"
+        type="button"
+        :data-testid="`recording-metric-${card.id}`"
+        :aria-pressed="filter === card.id"
+        :aria-label="
+          t('JRC_CONTACT_CENTER.RECORDINGS.OPEN_METRIC', { name: card.title })
+        "
+        :disabled="loading"
+        class="min-w-0 rounded-2xl border p-4 text-left shadow-sm transition-shadow hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-wait disabled:opacity-70"
+        :class="[card.color, filter === card.id ? 'ring-2 ring-current' : '']"
+        @click="selectFilter(card.id)"
       >
-        <div
-          class="flex items-center gap-2 text-xs font-semibold text-n-slate-10"
-        >
-          <Icon :icon="icon" class="size-4 shrink-0 text-n-blue-10" /><span>{{
-            title
+        <div class="flex items-center gap-2 text-xs font-semibold">
+          <Icon :icon="card.icon" class="size-4 shrink-0" /><span>{{
+            card.title
           }}</span>
         </div>
-        <p class="mt-4 text-3xl font-bold tabular-nums">{{ value }}</p>
-      </div>
+        <p class="mt-4 text-3xl font-bold tabular-nums">{{ card.value }}</p>
+        <p class="mt-2 text-xs underline">
+          {{ t('JRC_CONTACT_CENTER.RECORDINGS.VIEW_RECORDINGS') }}
+        </p>
+      </button>
     </div>
     <p class="text-xs leading-relaxed text-n-slate-10">
       {{ t('JRC_CONTACT_CENTER.RECORDINGS.AVERAGE_NOTICE') }}
+    </p>
+    <p
+      v-if="metrics.average_count !== undefined"
+      role="status"
+      class="text-xs leading-relaxed text-n-slate-10"
+    >
+      {{
+        t('JRC_CONTACT_CENTER.RECORDINGS.AVERAGE_COUNTS', {
+          count: metrics.average_count,
+          partial: metrics.partial_count,
+        })
+      }}
+      <span v-if="metrics.average_count === 0">{{
+        t('JRC_CONTACT_CENTER.RECORDINGS.AVERAGE_EMPTY')
+      }}</span>
     </p>
     <div
       class="grid min-w-0 gap-5 2xl:grid-cols-[minmax(260px,1fr)_minmax(0,2fr)]"
@@ -458,6 +549,7 @@ onUnmounted(() => {
         </button>
       </section>
       <section
+        ref="historySection"
         class="flex min-w-0 flex-col rounded-2xl border border-n-weak bg-n-solid-1 p-5 shadow-sm"
       >
         <header class="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -473,6 +565,33 @@ onUnmounted(() => {
             {{ t('JRC_CONTACT_CENTER.RECORDINGS.REFRESH') }}
           </button>
         </header>
+        <nav
+          :aria-label="t('JRC_CONTACT_CENTER.RECORDINGS.HISTORY_FILTERS')"
+          class="mb-4 flex flex-wrap gap-2"
+        >
+          <button
+            v-for="option in historyFilters"
+            :key="option.id"
+            type="button"
+            :data-testid="`recording-filter-${option.id}`"
+            :aria-pressed="filter === option.id"
+            :disabled="loading"
+            class="rounded-full border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+            :class="
+              filter === option.id
+                ? 'border-n-blue-9 bg-n-blue-9 text-white'
+                : 'border-n-weak bg-n-solid-1 text-n-slate-11 hover:bg-n-alpha-2'
+            "
+            @click="selectFilter(option.id)"
+          >
+            {{ option.label }}
+          </button>
+        </nav>
+        <p class="mb-3 text-xs leading-relaxed text-n-slate-10">
+          {{
+            t('JRC_CONTACT_CENTER.RECORDINGS.FILTER_NOTICE', { count: perPage })
+          }}
+        </p>
         <div class="min-w-0 flex-1 overflow-x-auto">
           <table class="w-full text-left text-xs">
             <thead class="bg-n-solid-2 text-n-slate-10">
@@ -515,7 +634,8 @@ onUnmounted(() => {
                 <td class="min-w-32 max-w-56 break-all p-3">
                   <button
                     type="button"
-                    class="text-left font-semibold text-n-blue-11 underline"
+                    class="line-clamp-2 break-all text-left font-semibold text-n-blue-11 underline"
+                    :title="item.filename"
                     @click="openAudit(item.id)"
                   >
                     {{ item.filename }}
@@ -576,11 +696,7 @@ onUnmounted(() => {
                   colspan="8"
                   class="py-16 text-center text-sm text-n-slate-10"
                 >
-                  {{
-                    loading
-                      ? t('JRC_CONTACT_CENTER.COMMON.LOADING')
-                      : t('JRC_CONTACT_CENTER.RECORDINGS.EMPTY')
-                  }}
+                  {{ emptyHistoryMessage }}
                 </td>
               </tr>
             </tbody>
@@ -602,7 +718,7 @@ onUnmounted(() => {
           }}</span>
           <button
             type="button"
-            :disabled="page * 25 >= total || loading"
+            :disabled="page * perPage >= total || loading"
             class="rounded-lg border border-n-weak px-3 py-2 disabled:opacity-40"
             @click="changePage(1)"
           >
